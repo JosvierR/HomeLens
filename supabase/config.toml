@@ -247,10 +247,11 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# OTP / magic-link email: include {{ .Token }} so users can sign in by code.
-[auth.email.template.magic_link]
-subject = "Your HomeLens sign-in code"
-content_path = "supabase/templates/magic_link.html"
+# OTP email template requires paid plan or custom SMTP on hosted free projects
+# created after 2026-06-03. Demo auth uses email+password instead.
+# [auth.email.template.magic_link]
+# subject = "Your HomeLens sign-in code"
+# content_path = "supabase/templates/magic_link.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
