@@ -15,9 +15,10 @@ export default defineNuxtConfig({
     head: {
       title: 'HomeLens',
       meta: [
+        { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
         {
           name: 'description',
-          content: 'Decision confidence for physical-world measurements. HomeLens shows which uncertainty can change a downstream decision, then asks a human to verify only what matters.'
+          content: 'HomeLens estimates room geometry from visual evidence and carries the uncertainty forward. It asks a human to verify only the measurement that can change the result.'
         }
       ]
     }

@@ -1,16 +1,19 @@
 import type { DecisionMeasurement, DecisionRoomScan } from './decision-confidence'
 import { measurementUncertaintyBounds } from './decision-confidence'
+import { formatFeet, formatPercent } from './format'
 
 export const FIT_CHECK_MODEL_VERSION = 'fit-check-v1' as const
 
 /** Half-width of a 90% interval expressed in standard deviations. */
 const NINETY_PERCENT_Z = 1.6448536269514722
 const FITS_THRESHOLD = 0.9
-const TIGHT_THRESHOLD = 0.5
+const UNCERTAIN_THRESHOLD = 0.5
+const IMPACT_EPSILON = 1e-6
 
 export type FitDimensionId = 'width' | 'length' | 'height'
-export type FitVerdict = 'fits' | 'tight' | 'does_not_fit' | 'unsupported'
+export type FitVerdict = 'fits' | 'uncertain' | 'does_not_fit' | 'unsupported'
 export type FitOrientation = 'long_along_width' | 'long_along_length'
+export type FitCertainty = 'verified' | 'estimated'
 
 export interface FitItem {
   id: string
@@ -29,30 +32,47 @@ export interface FitItem {
 export interface FitDimensionCheck {
   measurementId: FitDimensionId
   label: string
+  /** Footprint plus the access space this dimension has to absorb. */
   requiredFeet: number
   availableFeet: number
+  /** Available minus required. Negative means the item is short of space. */
   marginFeet: number
   probability: number
   verified: boolean
+}
+
+export interface FitCriticalMeasurement {
+  measurementId: FitDimensionId
+  label: string
+  /** Expected movement in the fit answer if this dimension were taped. */
+  decisionImpact: number
+  /** Fit probability if the tape confirms the current estimate. */
+  probabilityIfConfirmed: number
 }
 
 export interface FitCheckResult {
   item: FitItem
   verdict: FitVerdict
   probability: number
-  marginFeet: number
+  certainty: FitCertainty
   orientation: FitOrientation
   checks: FitDimensionCheck[]
-  limiting: FitDimensionCheck | null
-  /** The one measurement worth taping to turn a probable answer into a definitive one. */
-  nextVerification: { measurementId: FitDimensionId, label: string, probabilityIfConfirmed: number } | null
+  /**
+   * The binding constraint: the dimension with the smallest remaining space
+   * after the required walkway. Every clearance number shown in the UI comes
+   * from this single check so the figure and the copy can never disagree.
+   */
+  clearance: FitDimensionCheck | null
+  clearanceFeet: number | null
+  criticalMeasurement: FitCriticalMeasurement | null
   summary: string
   modelVersion: typeof FIT_CHECK_MODEL_VERSION
 }
 
 /**
  * Footprints use common US retail sizes; clearances follow standard residential
- * circulation guidance (about 3 ft for walkways and chair pull-out, 2 ft for bed access).
+ * circulation guidance (about 3 ft for walkways and chair pull-out, 2 ft for bed
+ * access). These are planning assumptions, not building-code compliance.
  */
 export const FIT_CATALOG: readonly FitItem[] = [
   {
@@ -81,7 +101,7 @@ export const FIT_CATALOG: readonly FitItem[] = [
     shortSideFeet: 3.5,
     clearanceFeet: 2,
     minCeilingFeet: 7.5,
-    rationale: 'Twin bunk footprint plus the ceiling height needed for the top bunk.'
+    rationale: 'Twin bunk footprint plus clearance for the top bunk.'
   },
   {
     id: 'three_seat_sofa',
@@ -99,7 +119,7 @@ export const FIT_CATALOG: readonly FitItem[] = [
     longSideFeet: 9,
     shortSideFeet: 6.5,
     clearanceFeet: 2.5,
-    rationale: 'Typical 108 x 78 in sectional with a 2.5 ft walkway.'
+    rationale: '108 x 78 in sectional with a 2.5 ft walkway in front.'
   },
   {
     id: 'dining_table_six',
@@ -172,24 +192,31 @@ const buildCheck = (
 
 const verdictFor = (probability: number): FitVerdict => {
   if (probability >= FITS_THRESHOLD) return 'fits'
-  if (probability >= TIGHT_THRESHOLD) return 'tight'
+  if (probability >= UNCERTAIN_THRESHOLD) return 'uncertain'
   return 'does_not_fit'
 }
 
-const feet = (value: number) => `${value.toFixed(1)} ft`
+const summarize = (
+  verdict: FitVerdict,
+  certainty: FitCertainty,
+  probability: number,
+  clearance: FitDimensionCheck | null
+) => {
+  if (verdict === 'unsupported' || !clearance) {
+    return 'This item cannot be checked without width, length, and ceiling height.'
+  }
 
-const summarize = (item: FitItem, verdict: FitVerdict, probability: number, limiting: FitDimensionCheck | null) => {
-  if (verdict === 'unsupported') return `${item.label} cannot be checked without width, length, and ceiling height.`
-  const chance = `${Math.round(probability * 100)}% of the measured range`
-  if (!limiting) return `${item.label} fits in ${chance}.`
-  const shortfall = Math.abs(limiting.marginFeet)
+  const dimension = clearance.label.toLowerCase()
   if (verdict === 'does_not_fit') {
-    return `${item.label} needs ${feet(limiting.requiredFeet)} of ${limiting.label.toLowerCase()} and the room measures ${feet(limiting.availableFeet)}, short by ${feet(shortfall)}.`
+    const room = certainty === 'verified' ? 'the verified room' : 'the room'
+    return `Needs ${formatFeet(clearance.requiredFeet)} of ${dimension} and ${room} measures ${formatFeet(clearance.availableFeet)}, short by ${formatFeet(Math.abs(clearance.marginFeet))}.`
   }
-  if (verdict === 'tight') {
-    return `${item.label} only clears ${limiting.label.toLowerCase()} by ${feet(limiting.marginFeet)}, so it fits in ${chance}.`
+
+  if (certainty === 'verified') {
+    return `Fits with the verified room dimensions, with ${formatFeet(clearance.marginFeet)} to spare on ${dimension}.`
   }
-  return `${item.label} fits in ${chance} with ${feet(limiting.marginFeet)} to spare on ${limiting.label.toLowerCase()}.`
+
+  return `Clears the room in ${formatPercent(probability)} of plausible room measurements, with ${formatFeet(clearance.marginFeet)} to spare on ${dimension} at the measured value.`
 }
 
 const orientationResult = (
@@ -214,6 +241,32 @@ const orientationResult = (
 }
 
 /**
+ * Rank which dimension is worth taping by expected decision movement rather than
+ * by lowest confidence. A dimension only matters when it is both uncertain and
+ * still able to change the answer: 2 * P(others) * p * (1 - p) is zero for a
+ * settled dimension and zero when the other dimensions already decide the case.
+ */
+const criticalMeasurementFor = (checks: readonly FitDimensionCheck[]): FitCriticalMeasurement | null => {
+  const candidates = checks
+    .filter(check => !check.verified)
+    .map(check => {
+      const others = checks
+        .filter(other => other.measurementId !== check.measurementId)
+        .reduce((total, other) => total * other.probability, 1)
+      return {
+        measurementId: check.measurementId,
+        label: check.label,
+        decisionImpact: 2 * others * check.probability * (1 - check.probability),
+        probabilityIfConfirmed: others * (check.marginFeet >= 0 ? 1 : 0)
+      }
+    })
+    .filter(candidate => candidate.decisionImpact > IMPACT_EPSILON)
+    .sort((a, b) => b.decisionImpact - a.decisionImpact || a.measurementId.localeCompare(b.measurementId))
+
+  return candidates[0] ?? null
+}
+
+/**
  * Answer "does this actually fit?" against the measured room instead of a single
  * point estimate. Each dimension is treated as a normal distribution derived from
  * its uncertainty interval, so the result is a probability over the measured range.
@@ -230,12 +283,13 @@ export const evaluateItemFit = (scan: DecisionRoomScan, item: FitItem): FitCheck
       item,
       verdict: 'unsupported',
       probability: 0,
-      marginFeet: 0,
+      certainty: 'estimated',
       orientation: 'long_along_width',
       checks: [],
-      limiting: null,
-      nextVerification: null,
-      summary: summarize(item, 'unsupported', 0, null),
+      clearance: null,
+      clearanceFeet: null,
+      criticalMeasurement: null,
+      summary: summarize('unsupported', 'estimated', 0, null),
       modelVersion: FIT_CHECK_MODEL_VERSION
     }
   }
@@ -246,32 +300,23 @@ export const evaluateItemFit = (scan: DecisionRoomScan, item: FitItem): FitCheck
   ]
   const best = candidates.reduce((winner, candidate) => candidate.probability > winner.probability ? candidate : winner)
 
-  const limiting = best.checks.reduce<FitDimensionCheck | null>((worst, check) =>
-    !worst || check.probability < worst.probability ? check : worst, null)
+  // One canonical clearance: the tightest dimension after its required access space.
+  const clearance = best.checks.reduce<FitDimensionCheck>((tightest, check) =>
+    check.marginFeet < tightest.marginFeet ? check : tightest, best.checks[0]!)
+  const certainty: FitCertainty = best.checks.every(check => check.verified) ? 'verified' : 'estimated'
   const verdict = verdictFor(best.probability)
-
-  const unresolved = best.checks.filter(check => !check.verified && check.probability < 0.999)
-  const target = unresolved.reduce<FitDimensionCheck | null>((worst, check) =>
-    !worst || check.probability < worst.probability ? check : worst, null)
-  const probabilityIfConfirmed = target
-    ? best.checks.reduce((total, check) =>
-      check.measurementId === target.measurementId
-        ? total * (check.marginFeet >= 0 ? 1 : 0)
-        : total * check.probability, 1)
-    : 0
 
   return {
     item,
     verdict,
     probability: best.probability,
-    marginFeet: best.checks.reduce((smallest, check) => Math.min(smallest, check.marginFeet), Number.POSITIVE_INFINITY),
+    certainty,
     orientation: best.orientation,
     checks: best.checks,
-    limiting,
-    nextVerification: target
-      ? { measurementId: target.measurementId, label: target.label, probabilityIfConfirmed }
-      : null,
-    summary: summarize(item, verdict, best.probability, limiting),
+    clearance,
+    clearanceFeet: clearance.marginFeet,
+    criticalMeasurement: criticalMeasurementFor(best.checks),
+    summary: summarize(verdict, certainty, best.probability, clearance),
     modelVersion: FIT_CHECK_MODEL_VERSION
   }
 }
@@ -284,36 +329,44 @@ export const evaluateRoomFit = (
   .sort((a, b) => b.probability - a.probability || a.item.id.localeCompare(b.item.id))
 
 export interface FitCheckSummary {
+  total: number
   fits: number
-  tight: number
+  uncertain: number
   doesNotFit: number
   /** The measurement that would resolve the most undecided items if it were taped. */
   decidingMeasurementId: FitDimensionId | null
+  decidingLabel: string | null
+  allResolved: boolean
   headline: string
 }
 
 export const summarizeRoomFit = (results: readonly FitCheckResult[]): FitCheckSummary => {
   const fits = results.filter(result => result.verdict === 'fits').length
-  const tight = results.filter(result => result.verdict === 'tight').length
+  const uncertain = results.filter(result => result.verdict === 'uncertain').length
   const doesNotFit = results.filter(result => result.verdict === 'does_not_fit').length
 
-  const undecidedCounts = new Map<FitDimensionId, number>()
+  const impactByMeasurement = new Map<FitDimensionId, { impact: number, label: string }>()
   results
-    .filter(result => result.verdict === 'tight')
+    .filter(result => result.verdict === 'uncertain' && result.criticalMeasurement)
     .forEach(result => {
-      const id = result.nextVerification?.measurementId
-      if (id) undecidedCounts.set(id, (undecidedCounts.get(id) ?? 0) + 1)
+      const critical = result.criticalMeasurement!
+      const existing = impactByMeasurement.get(critical.measurementId)
+      impactByMeasurement.set(critical.measurementId, {
+        impact: (existing?.impact ?? 0) + critical.decisionImpact,
+        label: critical.label
+      })
     })
-  const deciding = [...undecidedCounts.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]
+  const deciding = [...impactByMeasurement.entries()]
+    .sort((a, b) => b[1].impact - a[1].impact || a[0].localeCompare(b[0]))[0]
 
   return {
+    total: results.length,
     fits,
-    tight,
+    uncertain,
     doesNotFit,
     decidingMeasurementId: deciding?.[0] ?? null,
-    headline: tight
-      ? `${fits} of ${results.length} items clear the room; ${tight} depend on measurement uncertainty.`
-      : `${fits} of ${results.length} items clear the room with the current measurements.`
+    decidingLabel: deciding?.[1].label ?? null,
+    allResolved: uncertain === 0,
+    headline: `${fits} of ${results.length} common items fit with the current room measurements.`
   }
 }

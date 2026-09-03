@@ -68,6 +68,9 @@ export interface CalibrationBucket {
 
 export type CalibrationQuality = 'good' | 'moderate' | 'poor' | 'insufficient'
 
+/** Where the evidence behind a calibration figure came from. */
+export type CalibrationEvidenceOrigin = 'none' | 'synthetic_demo' | 'real_user_verification' | 'mixed'
+
 export interface CalibrationSummary {
   sampleCount: number
   expectedCalibrationError: number | null
@@ -75,6 +78,21 @@ export interface CalibrationSummary {
   tolerance: CalibrationTolerance
   buckets: CalibrationBucket[]
   demoEvidenceCount: number
+  /** Verifications by real users. Only these count as production learning. */
+  productionEvidenceCount: number
+  origin: CalibrationEvidenceOrigin
+}
+
+/** Production learning must never be computed from synthetic demo history. */
+export const filterProductionEvidence = (evidence: readonly MeasurementEvidence[]) =>
+  evidence.filter(item => !item.demo)
+
+export const evidenceOriginOf = (evidence: readonly MeasurementEvidence[]): CalibrationEvidenceOrigin => {
+  if (!evidence.length) return 'none'
+  const synthetic = evidence.filter(item => item.demo).length
+  if (synthetic === 0) return 'real_user_verification'
+  if (synthetic === evidence.length) return 'synthetic_demo'
+  return 'mixed'
 }
 
 export interface CalibrationContext {
@@ -92,7 +110,10 @@ export interface CalibratedConfidenceSuggestion {
   scope: 'exact_context' | 'measurement_type' | 'global' | 'raw_fallback'
   sampleCount: number
   quality: CalibrationQuality
+  /** True when any of the comparable samples is synthetic demo history. */
   demoEvidence: boolean
+  syntheticSampleCount: number
+  productionSampleCount: number
   reason: string
 }
 
@@ -215,7 +236,9 @@ export const calculateCalibrationSummary = (
     quality,
     tolerance,
     buckets,
-    demoEvidenceCount: evidence.filter(item => item.demo).length
+    demoEvidenceCount: evidence.filter(item => item.demo).length,
+    productionEvidenceCount: filterProductionEvidence(evidence).length,
+    origin: evidenceOriginOf(evidence)
   }
 }
 
@@ -226,19 +249,67 @@ const exactContextMatch = (item: MeasurementEvidence, context: CalibrationContex
   return contextFields.every(field => context[field] === undefined || item[field] === context[field])
 }
 
+type CalibrationSuggestionOptions = {
+  tolerance?: CalibrationTolerance
+  minimums?: CalibrationMinimums
+}
+
+const isTolerance = (value: unknown): value is CalibrationTolerance =>
+  Boolean(value) && typeof value === 'object' && 'relativeError' in (value as object)
+
+/**
+ * Production learning is computed from real verifications first. Synthetic
+ * history is only used as a labeled preview when real evidence is still short.
+ * The two pools are never mixed into one adjustment.
+ */
 export const suggestCalibratedConfidence = (
   rawConfidence: number,
   evidenceInput: readonly MeasurementEvidence[],
   context: CalibrationContext = {},
-  tolerance: CalibrationTolerance = DEFAULT_CALIBRATION_TOLERANCE,
-  minimums: CalibrationMinimums = DEFAULT_CALIBRATION_MINIMUMS
+  toleranceOrOptions: CalibrationTolerance | CalibrationSuggestionOptions = DEFAULT_CALIBRATION_TOLERANCE,
+  maybeMinimums: CalibrationMinimums = DEFAULT_CALIBRATION_MINIMUMS
 ): CalibratedConfidenceSuggestion => {
   assertConfidence(rawConfidence)
+  const options = isTolerance(toleranceOrOptions)
+    ? { tolerance: toleranceOrOptions, minimums: maybeMinimums }
+    : {
+        tolerance: toleranceOrOptions.tolerance ?? DEFAULT_CALIBRATION_TOLERANCE,
+        minimums: toleranceOrOptions.minimums ?? maybeMinimums
+      }
+  const tolerance = options.tolerance ?? DEFAULT_CALIBRATION_TOLERANCE
+  const minimums = options.minimums ?? DEFAULT_CALIBRATION_MINIMUMS
   validateTolerance(tolerance)
+
   const evidence = evidenceInput.map(item => measurementEvidenceSchema.parse(item))
+  const fromProduction = suggestFromPool(rawConfidence, filterProductionEvidence(evidence), context, tolerance, minimums, false)
+  if (fromProduction.applied) return fromProduction
+  const fromSynthetic = suggestFromPool(rawConfidence, evidence.filter(item => item.demo), context, tolerance, minimums, true)
+  if (fromSynthetic.applied) return fromSynthetic
+
+  return {
+    rawConfidence,
+    calibratedConfidence: rawConfidence,
+    applied: false,
+    scope: 'raw_fallback',
+    sampleCount: 0,
+    quality: 'insufficient',
+    demoEvidence: false,
+    syntheticSampleCount: 0,
+    productionSampleCount: 0,
+    reason: 'Not enough real verified history yet; the original model confidence is used unchanged.'
+  }
+}
+
+const suggestFromPool = (
+  rawConfidence: number,
+  evidence: MeasurementEvidence[],
+  context: CalibrationContext,
+  tolerance: CalibrationTolerance,
+  minimums: CalibrationMinimums,
+  syntheticPool: boolean
+): CalibratedConfidenceSuggestion => {
   const targetBucket = calculateCalibrationBucket(rawConfidence).index
   const hasSpecificContext = contextFields.some(field => context[field] !== undefined)
-
   const candidates: Array<{
     scope: CalibratedConfidenceSuggestion['scope']
     minimum: number
@@ -267,7 +338,6 @@ export const suggestCalibratedConfidence = (
     if (comparable.length < minimums.bucket) continue
     const calibratedConfidence = comparable.filter(item => item.relativeError <= tolerance.relativeError).length / comparable.length
     const summary = calculateCalibrationSummary(candidate.items, tolerance, minimums)
-    const demoEvidence = comparable.some(item => item.demo)
     const scopeLabel = candidate.scope === 'exact_context'
       ? 'matching capture context'
       : candidate.scope === 'measurement_type'
@@ -280,8 +350,12 @@ export const suggestCalibratedConfidence = (
       scope: candidate.scope,
       sampleCount: comparable.length,
       quality: summary.quality,
-      demoEvidence,
-      reason: `Based on ${comparable.length} observations${demoEvidence ? ' including synthetic demo evidence' : ''} from ${scopeLabel} in the same confidence range.`
+      demoEvidence: syntheticPool,
+      syntheticSampleCount: syntheticPool ? comparable.length : 0,
+      productionSampleCount: syntheticPool ? 0 : comparable.length,
+      reason: syntheticPool
+        ? `Preview based on ${comparable.length} synthetic comparison samples from ${scopeLabel} in the same confidence range. Synthetic history is not production evidence.`
+        : `Based on ${comparable.length} comparable verified measurements from ${scopeLabel} in the same confidence range.`
     }
   }
 
@@ -293,6 +367,8 @@ export const suggestCalibratedConfidence = (
     sampleCount: 0,
     quality: 'insufficient',
     demoEvidence: false,
-    reason: 'Not enough comparable verification evidence; raw model confidence is used unchanged.'
+    syntheticSampleCount: 0,
+    productionSampleCount: 0,
+    reason: 'Not enough real verified history yet; the original model confidence is used unchanged.'
   }
 }

@@ -39,8 +39,8 @@ const steps = [
         <p class="brand-mark">HomeLens</p>
         <h1>Know what actually needs checking.</h1>
         <p class="hero-intro">
-          Capture a room with your phone. HomeLens estimates supported dimensions from multiple views,
-          shows a likely range, and asks you to check only the uncertainty that can change the result.
+          HomeLens estimates room geometry from visual evidence and carries the uncertainty forward.
+          If the answer is already stable, it leaves you alone. If one measurement could change it, that is the one worth checking.
         </p>
         <div class="hero-actions">
           <NuxtLink to="/scan" class="button">Scan a room</NuxtLink>

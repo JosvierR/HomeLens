@@ -13,10 +13,9 @@ const capturedTime = (value: string) => {
 
 <template>
   <section class="captured-views" aria-labelledby="captured-views-title">
-    <h2 id="captured-views-title" class="section-label">Views this estimate came from</h2>
-    <p class="captured-note">
-      These are the photos the measurements were derived from. Full-resolution originals stay in private storage.
-    </p>
+    <h2 id="captured-views-title" class="section-label">Views used for this estimate</h2>
+    <p class="captured-note">These are the camera views that supported the room estimate.</p>
+    <p class="captured-privacy">Original images remain private.</p>
 
     <ul class="captured-strip">
       <li v-for="view in views" :key="view.captureId">
@@ -41,11 +40,25 @@ const capturedTime = (value: string) => {
 
 .captured-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
   margin: 14px 0 0;
   padding: 0;
   list-style: none;
+}
+
+.captured-privacy {
+  margin: 4px 0 0;
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+}
+
+@media (max-width: 700px) {
+  .captured-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 420px) {
+  .captured-strip { grid-template-columns: 1fr; }
 }
 
 .captured-strip li {

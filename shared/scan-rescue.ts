@@ -64,7 +64,9 @@ const recommendationFor = (
 ): RescueRecommendation => {
   const stabilityGain = projectedStability - currentStability
   const calibrationContext = calibration?.applied
-    ? ` Historical evidence adjusts reliability from ${Math.round(calibration.rawConfidence * 100)}% to ${Math.round(calibration.calibratedConfidence * 100)}% (${calibration.sampleCount} comparable observations).`
+    ? calibration.demoEvidence
+      ? ` A calibration preview built from ${calibration.sampleCount} synthetic comparison samples moves confidence from ${Math.round(calibration.rawConfidence * 100)}% to ${Math.round(calibration.calibratedConfidence * 100)}%.`
+      : ` Historical evidence adjusts confidence from ${Math.round(calibration.rawConfidence * 100)}% to ${Math.round(calibration.calibratedConfidence * 100)}% (${calibration.sampleCount} comparable verified measurements).`
     : ''
   return {
     measurementId: item.measurementId,

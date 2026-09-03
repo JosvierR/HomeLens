@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { DecisionConfidenceResult, RecommendationBand } from '~~/shared/decision-confidence'
+import { formatCount, formatIndex, formatPercent } from '~~/shared/format'
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   result: DecisionConfidenceResult | null
   pending?: boolean
   errorMessage?: string | null
@@ -19,12 +20,17 @@ const bandLabel: Record<RecommendationBand, string> = {
   standard: 'Standard',
   'high-capacity': 'High capacity'
 }
+
+/** A range of 129–129 is mathematically true and visually useless. */
+const rangeIsMeaningful = computed(() =>
+  Boolean(props.result) && props.result!.likelyRange.low !== props.result!.likelyRange.high
+)
 </script>
 
 <template>
   <section class="sensitivity" aria-labelledby="sensitivity-title" :aria-busy="pending">
     <h2 id="sensitivity-title" class="section-label">What could change this result?</h2>
-    <p class="sensitivity-note">Where the answer lands when uncertain measurements are varied together.</p>
+    <p class="sensitivity-note">How the result changes across plausible measurements.</p>
 
     <div v-if="pending && !result" class="sensitivity-loading">
       <div v-for="index in 3" :key="index" class="skeleton" />
@@ -50,12 +56,12 @@ const bandLabel: Record<RecommendationBand, string> = {
           <dt>{{ bandLabel[band] }}</dt>
           <dd>
             <span class="bar" aria-hidden="true"><i :style="{ width: `${result.bandDistribution[band] * 100}%` }" /></span>
-            <span class="numeric">{{ Math.round(result.bandDistribution[band] * 100) }}%</span>
+            <span class="numeric">{{ formatPercent(result.bandDistribution[band]) }}</span>
           </dd>
         </div>
       </dl>
 
-      <p v-if="result.verificationQueue[0]" class="driver">
+      <p v-if="result.verificationQueue[0] && result.stabilityLabel !== 'stable'" class="driver">
         <span>Main uncertainty</span>
         <strong>{{ result.verificationQueue[0].label }}</strong>
       </p>
@@ -68,7 +74,11 @@ const bandLabel: Record<RecommendationBand, string> = {
         @click="detailsOpen = !detailsOpen"
       >Show scenario details</button>
       <div v-show="detailsOpen" id="sensitivity-details" class="details-panel">
-        <p class="numeric">{{ result.scenarioCount }} scenarios · planning index {{ result.baselineIndex }} · likely range {{ result.likelyRange.low }}–{{ result.likelyRange.high }}</p>
+        <p class="numeric">
+          {{ formatCount(result.scenarioCount) }} scenarios · planning index {{ formatIndex(result.baselineIndex) }} ·
+          <template v-if="rangeIsMeaningful">likely range {{ formatIndex(result.likelyRange.low) }}–{{ formatIndex(result.likelyRange.high) }}</template>
+          <template v-else>stable across all scenarios</template>
+        </p>
         <p v-if="result.verificationQueue[0]">{{ result.verificationQueue[0].reason }}</p>
       </div>
     </template>

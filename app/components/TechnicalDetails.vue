@@ -3,6 +3,15 @@ import type { Measurement } from '~/types/scan'
 import type { CalibrationAnalysis } from '~~/shared/analysis'
 import type { DecisionConfidenceResult } from '~~/shared/decision-confidence'
 import type { RescueAction } from '~~/shared/scan-rescue'
+import {
+  formatCount,
+  formatFeetRange,
+  formatFeetTechnical,
+  formatIndex,
+  formatPercent,
+  formatPercentPoints,
+  formatPercentPrecise
+} from '~~/shared/format'
 
 const props = withDefaults(defineProps<{
   scan: {
@@ -27,6 +36,44 @@ const selectedCalibration = computed(() => {
 })
 
 const verified = computed(() => props.scan.measurements.filter(item => item.source === 'manual'))
+const photoDerived = computed(() => props.scan.measurements.filter(item => item.provenance?.measurementMethod === 'photo_metric_depth'))
+
+const mean = (values: number[]) => values.length
+  ? values.reduce((total, value) => total + value, 0) / values.length
+  : null
+
+const acceptedConfidence = computed(() => mean(props.scan.measurements.map(item => item.confidence)))
+const originalConfidence = computed(() => mean(props.scan.measurements.map(item => item.rawConfidence ?? item.originalEstimate?.confidence ?? item.confidence)))
+
+const calibrationOriginLabel = computed(() => {
+  switch (props.calibration?.summary.origin) {
+    case 'synthetic_demo': return 'synthetic_demo'
+    case 'real_user_verification': return 'real_user_verification'
+    case 'mixed': return 'mixed'
+    default: return 'none'
+  }
+})
+
+const delta = (measurement: Measurement) => {
+  const original = measurement.originalEstimate?.value
+  if (original === undefined) return null
+  const difference = measurement.value - original
+  return {
+    difference,
+    relative: Math.abs(difference) / measurement.value,
+    signed: `${difference >= 0 ? '+' : '-'}${formatFeetTechnical(Math.abs(difference), measurement.unit)}`
+  }
+}
+
+const modelVersions = computed(() => {
+  const provenance = photoDerived.value[0]?.provenance
+  return [
+    { label: 'Measurement model', value: props.scan.modelVersion },
+    { label: 'Photo depth model', value: provenance?.depthModelVersion },
+    { label: 'Geometry estimator', value: provenance?.geometryModelVersion },
+    { label: 'Confidence model', value: provenance?.confidenceModelVersion }
+  ].filter(entry => Boolean(entry.value))
+})
 </script>
 
 <template>
@@ -40,7 +87,7 @@ const verified = computed(() => props.scan.measurements.filter(item => item.sour
     >
       <span>
         <span id="technical-title" class="section-label">Technical details</span>
-        <span class="disclosure-hint">Raw confidence, scenarios, provenance and ranking</span>
+        <span class="disclosure-hint">Evidence, uncertainty, scenarios, ranking and provenance</span>
       </span>
       <span class="chevron" aria-hidden="true">{{ open ? '−' : '+' }}</span>
     </button>
@@ -49,39 +96,47 @@ const verified = computed(() => props.scan.measurements.filter(item => item.sour
       <dl class="tech-grid numeric">
         <div>
           <dt>Scenario count</dt>
-          <dd>{{ result?.scenarioCount ?? '—' }}</dd>
+          <dd>{{ formatCount(result?.scenarioCount) }}</dd>
         </div>
         <div>
           <dt>Decision stability</dt>
-          <dd>{{ result ? `${Math.round(result.bandStability * 100)}%` : '—' }}</dd>
+          <dd>{{ formatPercent(result?.bandStability) }}</dd>
         </div>
         <div>
           <dt>Planning index</dt>
-          <dd>{{ result?.baselineIndex ?? '—' }}</dd>
+          <dd>{{ formatIndex(result?.baselineIndex) }}</dd>
         </div>
         <div>
           <dt>Likely range</dt>
-          <dd>{{ result ? `${result.likelyRange.low}–${result.likelyRange.high}` : '—' }}</dd>
+          <dd>{{ result ? `${formatIndex(result.likelyRange.low)}–${formatIndex(result.likelyRange.high)}` : '—' }}</dd>
         </div>
         <div>
-          <dt>Raw confidence</dt>
-          <dd>{{ selectedCalibration ? `${Math.round(selectedCalibration.rawConfidence * 100)}%` : '—' }}</dd>
+          <dt>Accepted measurement confidence</dt>
+          <dd>{{ formatPercent(acceptedConfidence) }}</dd>
+        </div>
+        <div>
+          <dt>Original photo confidence</dt>
+          <dd>{{ formatPercent(originalConfidence) }}</dd>
         </div>
         <div>
           <dt>Calibrated confidence</dt>
-          <dd>{{ selectedCalibration?.applied ? `${Math.round(selectedCalibration.calibratedConfidence * 100)}%` : '—' }}</dd>
+          <dd>{{ selectedCalibration?.applied ? formatPercent(selectedCalibration.calibratedConfidence) : '—' }}</dd>
         </div>
         <div>
           <dt>Calibration samples</dt>
-          <dd>{{ selectedCalibration?.sampleCount ?? 0 }}</dd>
+          <dd>{{ formatCount(selectedCalibration?.sampleCount ?? 0) }}</dd>
         </div>
         <div>
-          <dt>Model version</dt>
-          <dd>{{ scan.modelVersion || '—' }}</dd>
+          <dt>Calibration evidence origin</dt>
+          <dd>{{ calibrationOriginLabel }}</dd>
         </div>
         <div>
           <dt>Capture method</dt>
           <dd>{{ scan.captureMethod || '—' }}</dd>
+        </div>
+        <div v-for="version in modelVersions" :key="version.label">
+          <dt>{{ version.label }}</dt>
+          <dd>{{ version.value }}</dd>
         </div>
         <div>
           <dt>Rescue status</dt>
@@ -89,37 +144,57 @@ const verified = computed(() => props.scan.measurements.filter(item => item.sour
         </div>
       </dl>
 
-      <div v-if="result?.verificationQueue.length" class="queue-block">
-        <h3>Rescue ranking</h3>
+      <div v-if="photoDerived.length" class="block">
+        <h3>Photo evidence</h3>
+        <ul>
+          <li v-for="measurement in photoDerived" :key="measurement.id">
+            <strong>{{ measurement.label }}</strong>
+            <span class="numeric">
+              {{ formatFeetTechnical(measurement.originalEstimate?.value ?? measurement.value, measurement.unit) }}
+              at {{ formatPercent(measurement.rawConfidence ?? measurement.confidence) }}
+              <template v-if="measurement.uncertaintyLow !== undefined && measurement.uncertaintyHigh !== undefined">
+                · {{ formatFeetRange(measurement.uncertaintyLow, measurement.uncertaintyHigh, measurement.unit) }}
+              </template>
+              · {{ formatCount(measurement.provenance?.supportingViewCount) }} view{{ measurement.provenance?.supportingViewCount === 1 ? '' : 's' }}
+            </span>
+          </li>
+        </ul>
+      </div>
+
+      <div v-if="result?.verificationQueue.length" class="block">
+        <h3>Verification ranking</h3>
         <ol>
           <li v-for="(item, index) in result.verificationQueue" :key="item.measurementId">
             <span>{{ index + 1 }}. {{ item.label }}</span>
-            <span class="numeric">{{ item.impactPercent.toFixed(1) }}% impact · score {{ item.priorityScore.toFixed(1) }}</span>
+            <span class="numeric">{{ formatPercentPoints(item.impactPercent) }} impact · score {{ formatPercentPoints(item.priorityScore) }}</span>
           </li>
         </ol>
       </div>
 
-      <div v-if="verified.length" class="provenance-block">
+      <div v-if="verified.length" class="block">
         <h3>Verification provenance</h3>
         <ul>
-          <li v-for="item in verified" :key="item.id">
-            <strong>{{ item.label }}</strong>
+          <li v-for="measurement in verified" :key="measurement.id">
+            <strong>{{ measurement.label }}</strong>
             <span class="numeric">
-              {{ item.value }} {{ item.unit }} verified
-              <template v-if="item.originalEstimate">
-                · original estimate {{ item.originalEstimate.value }} {{ item.unit }} at {{ Math.round(item.originalEstimate.confidence * 100) }}%
+              <template v-if="measurement.provenance?.measurementMethod === 'photo_metric_depth'">photo metric → human verified · </template>
+              verified {{ formatFeetTechnical(measurement.value, measurement.unit) }}
+              <template v-if="delta(measurement)">
+                · estimate {{ formatFeetTechnical(measurement.originalEstimate?.value, measurement.unit) }}
+                at {{ formatPercent(measurement.originalEstimate?.confidence) }}
+                · difference {{ delta(measurement)!.signed }} ({{ formatPercentPrecise(delta(measurement)!.relative) }})
               </template>
             </span>
           </li>
         </ul>
       </div>
 
-      <div v-if="result" class="distribution-block">
+      <div v-if="result" class="block">
         <h3>Scenario distribution</h3>
         <p class="numeric">
-          Compact {{ Math.round(result.bandDistribution.compact * 100) }}% ·
-          Standard {{ Math.round(result.bandDistribution.standard * 100) }}% ·
-          High capacity {{ Math.round(result.bandDistribution['high-capacity'] * 100) }}%
+          Compact {{ formatPercent(result.bandDistribution.compact) }} ·
+          Standard {{ formatPercent(result.bandDistribution.standard) }} ·
+          High capacity {{ formatPercent(result.bandDistribution['high-capacity']) }}
         </p>
       </div>
     </div>
@@ -181,34 +256,30 @@ const verified = computed(() => props.scan.measurements.filter(item => item.sour
   color: var(--text-primary);
   font-size: 0.86rem;
   font-weight: 560;
+  overflow-wrap: anywhere;
 }
 
-.queue-block,
-.provenance-block,
-.distribution-block {
+.block {
   margin-top: 16px;
   border-top: 1px solid var(--border);
   padding-top: 12px;
 }
 
-.queue-block h3,
-.provenance-block h3,
-.distribution-block h3 {
+.block h3 {
   margin: 0;
   color: var(--text-tertiary);
   font-size: 0.76rem;
   font-weight: 560;
 }
 
-.queue-block ol,
-.provenance-block ul {
+.block ol,
+.block ul {
   margin: 8px 0 0;
   padding: 0;
   list-style: none;
 }
 
-.queue-block li,
-.provenance-block li {
+.block li {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
@@ -218,12 +289,12 @@ const verified = computed(() => props.scan.measurements.filter(item => item.sour
   font-size: 0.82rem;
 }
 
-.provenance-block strong {
+.block strong {
   color: var(--text-primary);
   font-weight: 560;
 }
 
-.distribution-block p {
+.block p {
   margin: 6px 0 0;
   color: var(--text-secondary);
   font-size: 0.82rem;

@@ -24,6 +24,7 @@ const route = useRoute()
 .app-header {
   border-bottom: 1px solid var(--border);
   background: var(--canvas);
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .header-inner {

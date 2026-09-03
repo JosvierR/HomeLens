@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Measurement } from '~/types/scan'
 import type { VerificationPriority } from '~~/shared/decision-confidence'
+import { formatFeet, formatFeetPrecise, formatFeetRange, formatPercent } from '~~/shared/format'
 
 const props = withDefaults(defineProps<{
   measurements: Measurement[]
@@ -49,11 +50,44 @@ const impactLabel = (id: string) => {
 const isRecommended = (measurement: Measurement) =>
   props.recommendedId === measurement.id && measurement.source !== 'manual'
 
+const isVerified = (measurement: Measurement) => measurement.source === 'manual'
+
+/** A verified value keeps the origin it was measured from; it never collapses to "manual". */
+const cameFromPhoto = (measurement: Measurement) =>
+  measurement.provenance?.measurementMethod === 'photo_metric_depth'
+
+const sourceLabel = (measurement: Measurement) => {
+  if (isVerified(measurement)) return 'Verified'
+  if (cameFromPhoto(measurement)) return 'Photo estimate'
+  if (measurement.provenance?.measurementMethod === 'manual') return 'Manual entry'
+  return 'Estimate'
+}
+
+/** Compact provenance line: what the model predicted before a human confirmed it. */
+const originLine = (measurement: Measurement) => {
+  if (isVerified(measurement)) {
+    const original = measurement.originalEstimate
+    if (!original) return 'Entered manually'
+    if (!cameFromPhoto(measurement)) return `Entered manually · was ${formatFeetPrecise(original.value, measurement.unit)}`
+    return `Photo estimate ${formatFeetPrecise(original.value, measurement.unit)} · ${formatPercent(original.confidence)}`
+  }
+  const views = measurement.provenance?.supportingViewCount ?? 0
+  return views ? `Estimated from ${views} view${views === 1 ? '' : 's'}` : null
+}
+
+const likelyRange = (measurement: Measurement) => {
+  if (isVerified(measurement)) return null
+  const { uncertaintyLow, uncertaintyHigh, unit } = measurement
+  if (uncertaintyLow === undefined || uncertaintyHigh === undefined) return null
+  return `Likely ${formatFeetRange(uncertaintyLow, uncertaintyHigh, unit)}`
+}
+
 const beginEdit = async (id: string) => {
   if (props.disabled) return
   const measurement = props.measurements.find(item => item.id === id)
   if (!measurement) return
-  draftValue.value = String(measurement.value)
+  // Seed the input with a tape-readable number, never raw model precision.
+  draftValue.value = String(Number(measurement.value.toFixed(2)))
   openEditorId.value = id
   emit('select', id)
   emit('edit-state', id, true)
@@ -84,7 +118,7 @@ watch(() => props.savedId, id => {
 
 <template>
   <table class="measurement-table">
-    <caption class="sr-only">Room measurements with source, model confidence and decision impact. Select a row to trace it in the room geometry.</caption>
+    <caption class="sr-only">Room measurements with their source, confidence and decision impact. Verified rows show the photo estimate they came from. Select a row to trace it in the room geometry.</caption>
     <thead>
       <tr>
         <th scope="col">Measurement</th>
@@ -141,33 +175,28 @@ watch(() => props.savedId, id => {
             >
             <span class="unit">{{ measurement.unit }}</span>
           </form>
-          <span v-else class="measurement-value numeric">
-            {{ measurement.value }}<span class="unit">{{ measurement.unit }}</span>
-          </span>
-          <span v-if="measurement.source === 'estimated' && measurement.uncertaintyLow !== undefined && measurement.uncertaintyHigh !== undefined" class="uncertainty-range numeric">
-            {{ measurement.uncertaintyLow.toFixed(1) }}-{{ measurement.uncertaintyHigh.toFixed(1) }} {{ measurement.unit }}
-          </span>
+          <span v-else class="measurement-value numeric">{{ formatFeet(measurement.value, measurement.unit) }}</span>
+          <span v-if="likelyRange(measurement)" class="uncertainty-range numeric">{{ likelyRange(measurement) }}</span>
           <p v-if="openEditorId === measurement.id && !isValid" class="input-error">Enter a value between 0.1 and 100 ft.</p>
           <p v-if="errorId === measurement.id && errorMessage" class="input-error" role="alert">{{ errorMessage }}</p>
         </td>
 
         <td data-label="Source">
-          <span class="source">{{ measurement.source === 'manual' ? 'Verified' : measurement.provenance?.measurementMethod === 'photo_metric_depth' ? 'Metric depth' : 'Estimated' }}</span>
-          <span v-if="measurement.source === 'estimated' && measurement.provenance" class="original-estimate">
-            {{ measurement.provenance.supportingViewCount }} supporting view{{ measurement.provenance.supportingViewCount === 1 ? '' : 's' }}
-          </span>
-          <span v-if="measurement.source === 'manual' && measurement.originalEstimate" class="original-estimate numeric">
-            was {{ measurement.originalEstimate.value }} {{ measurement.unit }} at {{ Math.round(measurement.originalEstimate.confidence * 100) }}%
-          </span>
+          <span class="source" :class="{ 'source--verified': isVerified(measurement) }">{{ sourceLabel(measurement) }}</span>
+          <span v-if="originLine(measurement)" class="original-estimate numeric">{{ originLine(measurement) }}</span>
         </td>
 
         <td data-label="Confidence">
-          <ConfidenceBadge :confidence="measurement.confidence" />
+          <ConfidenceBadge v-if="!isVerified(measurement)" :confidence="measurement.confidence" />
+          <span v-else class="settled-cell">
+            <span aria-hidden="true">—</span>
+            <span class="sr-only">Human verified, so model confidence no longer applies</span>
+          </span>
         </td>
 
-        <td class="impact-cell align-right" data-label="Impact">
-          <span class="numeric">{{ (priorityFor(measurement.id)?.impactPercent ?? 0).toFixed(1) }}%</span>
-          <span class="impact-word">{{ impactLabel(measurement.id) }}</span>
+        <td class="impact-cell align-right" data-label="Decision impact">
+          <span v-if="isVerified(measurement)" class="settled-cell">Resolved</span>
+          <span v-else class="impact-word impact-word--primary">{{ impactLabel(measurement.id) }}</span>
         </td>
 
         <td class="action-cell">
@@ -326,6 +355,16 @@ thead th:last-child { padding-right: 0; }
   font-size: 0.82rem;
 }
 
+.source--verified {
+  color: var(--success);
+  font-weight: 560;
+}
+
+.settled-cell {
+  color: var(--text-tertiary);
+  font-size: 0.79rem;
+}
+
 .original-estimate {
   display: block;
   margin-top: 2px;
@@ -333,17 +372,16 @@ thead th:last-child { padding-right: 0; }
   font-size: 0.72rem;
 }
 
-.impact-cell .numeric {
+.impact-word {
+  display: block;
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+}
+
+.impact-word--primary {
   color: var(--text-primary);
   font-size: 0.83rem;
   font-weight: 600;
-}
-
-.impact-word {
-  display: block;
-  margin-top: 2px;
-  color: var(--text-tertiary);
-  font-size: 0.72rem;
 }
 
 .action-cell { text-align: right; white-space: nowrap; }
@@ -432,10 +470,7 @@ thead th:last-child { padding-right: 0; }
 
   .value-cell { text-align: right; }
 
-  .impact-cell { justify-content: flex-start; }
-  .impact-cell .numeric { margin-left: auto; }
-
-  .impact-cell .impact-word,
+  .impact-cell { justify-content: space-between; }
   .original-estimate { display: inline; margin-left: 6px; }
 
   .measurement-row > td { flex-wrap: wrap; }

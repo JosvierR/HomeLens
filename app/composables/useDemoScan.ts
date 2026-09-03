@@ -1,38 +1,13 @@
 import type { RoomScan } from '~/types/scan'
 import type { ManualVerificationResponse } from '~~/shared/verification'
+import { SYNTHETIC_DEMO_CAPTURE_METHOD, createUncertainFitDemoScan } from '~~/shared/demo-fixtures'
 
-const capturedAt = '2026-09-02T12:00:00.000Z'
-
-const createDemoScan = (): RoomScan => ({
-  id: 'scan_demo_001',
-  roomId: 'room_demo_living',
-  roomName: 'Living Room',
-  createdAt: capturedAt,
-  windows: 3,
-  doors: 0,
-  modelVersion: 'geometry-v1',
-  captureMethod: 'simulated-geometry',
-  deviceFamily: 'demo-phone',
-  roomCategory: 'living-area',
-  measurements: [
-    {
-      id: 'width', label: 'Width', value: 14.2, unit: 'ft', confidence: 0.94, rawConfidence: 0.94, source: 'estimated',
-      originalEstimate: { value: 14.2, confidence: 0.94, capturedAt }
-    },
-    {
-      id: 'length', label: 'Length', value: 18.6, unit: 'ft', confidence: 0.88, rawConfidence: 0.88, source: 'estimated',
-      originalEstimate: { value: 18.6, confidence: 0.88, capturedAt }
-    },
-    {
-      id: 'height', label: 'Ceiling height', value: 9.1, unit: 'ft', confidence: 0.71, rawConfidence: 0.71, source: 'estimated',
-      originalEstimate: { value: 9.1, confidence: 0.71, capturedAt }
-    }
-  ]
-})
+/** The reference synthetic room: settled planning band, undecided sectional, width decides it. */
+const createDemoScan = (): RoomScan => createUncertainFitDemoScan()
 
 export const useDemoScan = () => {
   const scan = useState<RoomScan>('demo-scan', createDemoScan)
-  const isDemo = computed(() => scan.value.captureMethod === 'simulated-geometry')
+  const isDemo = computed(() => scan.value.captureMethod === SYNTHETIC_DEMO_CAPTURE_METHOD)
   const verificationPending = useState<boolean>('demo-verification-pending', () => false)
   const verificationError = useState<string | null>('demo-verification-error', () => null)
   const lastEvidenceId = useState<string | null>('demo-last-evidence-id', () => null)

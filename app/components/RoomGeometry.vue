@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Measurement } from '~/types/scan'
+import { formatArea, formatFeet, formatPercent } from '~~/shared/format'
 
 const props = withDefaults(defineProps<{
   measurements: Measurement[]
@@ -23,7 +24,12 @@ const emit = defineEmits<{ select: [id: string] }>()
 const measurement = (id: string) => props.measurements.find(item => item.id === id)
 const measurementLabel = (id: string) => {
   const item = measurement(id)
-  return item ? `${item.label}, ${item.value} ${item.unit}, ${Math.round(item.confidence * 100)} percent confidence` : id
+  return item ? `${item.label}, ${formatFeet(item.value, item.unit)}, ${formatPercent(item.confidence)} confidence` : id
+}
+
+const dimensionValue = (id: string) => {
+  const item = measurement(id)
+  return item ? formatFeet(item.value, item.unit) : ''
 }
 
 const choose = (id: string) => {
@@ -87,7 +93,7 @@ const floorArea = computed(() => {
         <circle class="dimension-node" cx="137" cy="368" r="2.4" />
         <circle class="dimension-node" cx="391" cy="368" r="2.4" />
         <rect class="dimension-label-bg" x="230" y="357" width="68" height="22" rx="4" />
-        <text class="dimension-value" x="264" y="372">{{ measurement('width')?.value }} ft</text>
+        <text class="dimension-value" x="264" y="372">{{ dimensionValue('width') }}</text>
       </g>
 
       <g
@@ -106,7 +112,7 @@ const floorArea = computed(() => {
         <circle class="dimension-node" cx="101" cy="322" r="2.4" />
         <circle class="dimension-node" cx="292" cy="188" r="2.4" />
         <rect class="dimension-label-bg" x="163" y="244" width="68" height="22" rx="4" />
-        <text class="dimension-value" x="197" y="259">{{ measurement('length')?.value }} ft</text>
+        <text class="dimension-value" x="197" y="259">{{ dimensionValue('length') }}</text>
       </g>
 
       <g
@@ -126,7 +132,7 @@ const floorArea = computed(() => {
         <circle class="dimension-node" cx="627" cy="204" r="2.4" />
         <rect class="dimension-label-bg" x="591" y="146" width="72" height="22" rx="4" />
         <text class="dimension-value" x="627" y="161">
-          {{ measurement('height')?.value }} ft<tspan
+          {{ dimensionValue('height') }}<tspan
             v-if="(measurement('height')?.confidence ?? 1) < .75"
             class="dimension-flag"
             dx="4"
@@ -142,7 +148,7 @@ const floorArea = computed(() => {
 
     <div v-if="!compact" class="geometry-footer">
       <div class="geometry-meta">
-        <span class="meta-value">{{ floorArea }} ft²</span>
+        <span class="meta-value">{{ formatArea(floorArea) }}</span>
         <span>floor area</span>
       </div>
       <div class="geometry-legend" aria-label="Select a room dimension">

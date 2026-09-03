@@ -1,4 +1,9 @@
-import type { CalibratedConfidenceSuggestion, CalibrationSummary, MeasurementEvidence } from './calibration'
+import type {
+  CalibratedConfidenceSuggestion,
+  CalibrationEvidenceOrigin,
+  CalibrationSummary,
+  MeasurementEvidence
+} from './calibration'
 import { calculateCalibrationSummary, suggestCalibratedConfidence } from './calibration'
 import type { DecisionConfidenceResult, DecisionRoomScan } from './decision-confidence'
 import { calculateDecisionConfidence } from './decision-confidence'
@@ -9,6 +14,8 @@ export interface CalibrationAnalysis {
   status: 'available' | 'raw_fallback'
   summary: CalibrationSummary
   measurements: Record<string, CalibratedConfidenceSuggestion>
+  /** Origin of the evidence actually used, so the UI never dresses synthetic history as production learning. */
+  origin: CalibrationEvidenceOrigin
   message: string
 }
 
@@ -29,9 +36,12 @@ const rawFallback = (scan: DecisionRoomScan): CalibrationAnalysis => ({
     sampleCount: 0,
     quality: 'insufficient',
     demoEvidence: false,
-    reason: 'Calibration is unavailable; raw model confidence is used unchanged.'
+    syntheticSampleCount: 0,
+    productionSampleCount: 0,
+    reason: 'Calibration is unavailable; the original model confidence is used unchanged.'
   } satisfies CalibratedConfidenceSuggestion])),
-  message: 'Calibration is unavailable; analysis continues with raw model confidence.'
+  origin: 'none',
+  message: 'Calibration is unavailable; analysis continues with the original model confidence.'
 })
 
 export const calculateHomeLensAnalysis = (
@@ -53,14 +63,23 @@ export const calculateHomeLensAnalysis = (
         })
         return [measurement.id, suggestion]
       }))
-      const appliedCount = Object.values(measurements).filter(suggestion => suggestion.applied).length
+      const applied = Object.values(measurements).filter(suggestion => suggestion.applied)
+      const synthetic = applied.some(suggestion => suggestion.demoEvidence)
+      const production = applied.some(suggestion => suggestion.productionSampleCount > 0)
       calibration = {
-        status: appliedCount ? 'available' : 'raw_fallback',
+        status: applied.length ? 'available' : 'raw_fallback',
         summary: calculateCalibrationSummary(evidence),
         measurements,
-        message: appliedCount
-          ? `Historical calibration was applied to ${appliedCount} measurement${appliedCount === 1 ? '' : 's'}.`
-          : 'Evidence is below the minimum needed for adjustment; raw confidence is preserved.'
+        origin: !applied.length
+          ? 'none'
+          : synthetic && production
+            ? 'mixed'
+            : synthetic ? 'synthetic_demo' : 'real_user_verification',
+        message: !applied.length
+          ? 'Not enough real verified history yet; the original model confidence is preserved.'
+          : synthetic
+            ? `Calibration preview applied to ${applied.length} measurement${applied.length === 1 ? '' : 's'} using synthetic history.`
+            : `Historical calibration was applied to ${applied.length} measurement${applied.length === 1 ? '' : 's'}.`
       }
     } catch {
       calibration = rawFallback(scan)

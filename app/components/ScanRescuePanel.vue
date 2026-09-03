@@ -2,6 +2,7 @@
 import type { Measurement } from '~/types/scan'
 import type { VerificationPriority } from '~~/shared/decision-confidence'
 import type { RescueAction } from '~~/shared/scan-rescue'
+import { formatFeet, formatPercent, formatPercentPoints } from '~~/shared/format'
 
 const props = withDefaults(defineProps<{
   action: RescueAction | null
@@ -38,7 +39,6 @@ const otherItems = computed(() =>
   <section class="check-panel" aria-labelledby="check-title" :aria-busy="pending">
     <div class="check-heading">
       <h2 id="check-title">What to check next</h2>
-      <p class="tech-label">One measurement is worth checking</p>
     </div>
 
     <div v-if="pending && !action" class="check-loading">
@@ -57,23 +57,18 @@ const otherItems = computed(() =>
       <p>No verification recommendation is available.</p>
     </div>
 
-    <div v-else-if="action.status === 'stable'" class="stable-state" role="status">
-      <p><strong>Nothing left to verify.</strong></p>
-      <p>{{ action.reason }}</p>
-    </div>
-
     <div v-else class="check-body">
-      <p class="check-target">{{ action.label }}</p>
+      <p class="check-target">Check {{ action.label?.toLowerCase() }}</p>
       <p v-if="measurement" class="check-meta numeric">
-        {{ measurement.value }} {{ measurement.unit }}
+        {{ formatFeet(measurement.value, measurement.unit) }}
         <span aria-hidden="true">·</span>
-        Estimated
+        Photo estimate
         <span aria-hidden="true">·</span>
-        {{ Math.round(measurement.confidence * 100) }}% confidence
+        {{ formatPercent(measurement.confidence) }} confidence
       </p>
 
       <p class="check-reason">
-        Checking {{ action.label?.toLowerCase() }} could make your result much more reliable than checking the others first.
+        This is the one measurement most likely to change the result.
       </p>
 
       <p class="check-projection">
@@ -87,7 +82,7 @@ const otherItems = computed(() =>
         :disabled="disabled || !action.measurementId"
         @click="action.measurementId && emit('verify', action.measurementId)"
       >
-        Check this measurement
+        Verify {{ action.label?.toLowerCase() }}
       </button>
 
       <div v-if="otherItems.length" class="other-checks">
@@ -101,7 +96,7 @@ const otherItems = computed(() =>
               @click="emit('select', item.measurementId)"
             >
               <span>{{ item.label }}</span>
-              <span class="numeric">{{ item.impactPercent.toFixed(1) }}%</span>
+              <span class="numeric">{{ formatPercentPoints(item.impactPercent) }}</span>
             </button>
           </li>
         </ol>
@@ -120,12 +115,6 @@ const otherItems = computed(() =>
   font-size: 1rem;
   font-weight: 620;
   letter-spacing: -0.015em;
-}
-
-.tech-label {
-  margin: 2px 0 0;
-  color: var(--text-tertiary);
-  font-size: 0.74rem;
 }
 
 .check-body {
@@ -224,19 +213,6 @@ const otherItems = computed(() =>
   color: var(--text-secondary);
   font-size: 0.8rem;
 }
-
-.stable-state {
-  margin-top: 12px;
-  border-left: 2px solid var(--success);
-  padding-left: 12px;
-  color: var(--text-secondary);
-  font-size: 0.86rem;
-  line-height: 1.5;
-}
-
-.stable-state p { margin: 0; }
-.stable-state p + p { margin-top: 4px; }
-.stable-state strong { color: var(--text-primary); }
 
 .check-loading {
   display: grid;

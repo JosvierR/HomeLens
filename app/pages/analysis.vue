@@ -33,22 +33,20 @@ const recommendedPriority = computed(() =>
   prioritizedVerification.value.find(item => item.measurementId === rescueAction.value?.measurementId)
 )
 
+const hasVerificationAction = computed(() => rescueAction.value?.status === 'needs_verification' && Boolean(rescueAction.value.measurementId))
+const allHumanVerified = computed(() => scan.value.measurements.every(item => item.source === 'manual'))
+
 const feedbackCopy = computed(() => {
   if (!lastEvidence.value || !savedMeasurementId.value) return null
   const before = Math.round(lastEvidence.value.decisionStabilityBefore * 100)
   const after = Math.round(lastEvidence.value.decisionStabilityAfter * 100)
   const removedLargest = lastEvidence.value.stabilityGain > 0.05 && after > before
 
-  let detail = `Thanks. Reliability moved from ${before}% to ${after}%.`
+  let detail = `Reliability moved from ${before}% to ${after}%.`
   if (removedLargest) detail = 'That removed the largest source of uncertainty.'
-  else if (after < before) detail = `Thanks. Reliability moved from ${before}% to ${after}%.`
-  else if (after === before) detail = 'Thanks. The reliability stayed about the same.'
+  else if (after === before) detail = 'The result stayed about the same.'
 
-  const nextLine = rescueAction.value?.status === 'needs_verification'
-    ? 'The result is still sensitive to one other measurement.'
-    : 'Nothing else needs checking right now.'
-
-  return { detail, nextLine }
+  return { detail }
 })
 
 const learningInsight = computed(() => {
@@ -61,6 +59,7 @@ const learningInsight = computed(() => {
       calibratedConfidence: null as number | null,
       applied: false,
       sampleCount: 0,
+      origin: calibration.value?.origin ?? 'none' as const,
       explanation: 'Not enough comparable history yet. Using model confidence.'
     }
   }
@@ -69,6 +68,7 @@ const learningInsight = computed(() => {
     calibratedConfidence: fallback.applied ? fallback.calibratedConfidence : null,
     applied: fallback.applied,
     sampleCount: fallback.sampleCount,
+    origin: calibration.value?.origin ?? 'none',
     explanation: fallback.reason
   }
 })
@@ -211,10 +211,10 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
             <span aria-hidden="true">·</span>
             {{ scan.measurements.length }} measurements
             <span aria-hidden="true">·</span>
-            <template v-if="unresolvedMeasurements.length">
-              {{ unresolvedMeasurements.length }} worth checking
-            </template>
-            <template v-else>all verified</template>
+            <template v-if="isDemo">Demo</template>
+            <template v-else-if="allHumanVerified">all verified</template>
+            <template v-else-if="unresolvedMeasurements.length">{{ unresolvedMeasurements.length }} worth checking</template>
+            <template v-else>photo estimates</template>
           </p>
         </div>
         <div class="room-actions">
@@ -228,7 +228,6 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
 
       <div v-if="feedbackCopy" class="learning-feedback" role="status">
         <p><strong>Verified.</strong> {{ feedbackCopy.detail }}</p>
-        <p>{{ feedbackCopy.nextLine }}</p>
       </div>
 
       <div v-if="scan.measurements.length" class="analysis-stack">
@@ -263,6 +262,7 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
           </section>
 
           <ScanRescuePanel
+            v-if="hasVerificationAction"
             class="check-area"
             :action="rescueAction"
             :measurement="recommendedMeasurement"
@@ -317,6 +317,7 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
           :calibrated-confidence="learningInsight.calibratedConfidence"
           :applied="learningInsight.applied"
           :sample-count="learningInsight.sampleCount"
+          :origin="learningInsight.origin"
           :explanation="learningInsight.explanation"
         />
 
@@ -348,7 +349,7 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
           This sample uses synthetic measurements to demonstrate scenario analysis. Start a new scan to use your camera and real photo estimates.
         </template>
         <template v-else>
-          This result uses metric-depth geometry from your accepted camera views. Ranges and confidence reflect model and multi-view uncertainty; manually verified values remain the ground truth.
+          Photo-derived dimensions are estimates and should be verified when precision matters.
         </template>
       </p>
     </main>
@@ -363,7 +364,7 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
 
 .analysis-main {
   max-width: 1280px;
-  padding-block: 24px 48px;
+  padding-block: 24px calc(48px + env(safe-area-inset-bottom, 0px));
 }
 
 .room-header {
@@ -443,6 +444,10 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
   align-items: start;
 }
 
+.evidence-pair:not(:has(.check-area)) {
+  grid-template-columns: 1fr;
+}
+
 .geometry-area {
   min-width: 0;
   overflow: hidden;
@@ -481,6 +486,7 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
 
 .fit-area,
 .sensitivity-area,
+.learning-area,
 .calibration-area,
 .technical-area {
   border-top: 1px solid var(--border);
@@ -534,19 +540,20 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
   }
 
   .recommendation-area { order: 1; }
-  .captured-area { order: 2; }
-  .evidence-pair { order: 2; display: contents; }
-  .check-area { order: 3; }
+  .check-area { order: 2; }
+  .captured-area { order: 3; }
+  .evidence-pair { order: 3; display: contents; }
   .geometry-area { order: 4; }
   .measurements-area { order: 5; }
   .fit-area { order: 6; }
   .sensitivity-area { order: 7; }
-  .calibration-area { order: 8; }
-  .technical-area { order: 9; }
+  .learning-area { order: 8; }
+  .calibration-area { order: 9; }
+  .technical-area { order: 10; }
 }
 
 @media (max-width: 600px) {
-  .analysis-main { padding-block: 20px 36px; }
+  .analysis-main { padding-block: 20px calc(36px + env(safe-area-inset-bottom, 0px)); }
 
   .room-header {
     flex-direction: column;

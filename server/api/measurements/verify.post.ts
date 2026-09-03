@@ -1,5 +1,6 @@
 import { recordEvidence } from '~~/shared/calibration'
 import { calculateHomeLensAnalysis } from '~~/shared/analysis'
+import { SYNTHETIC_DEMO_CAPTURE_METHOD } from '~~/shared/demo-fixtures'
 import { applyManualVerification, manualVerificationRequestSchema } from '~~/shared/verification'
 import { ApiContractError, apiFailure, readContractBody } from '../../utils/api-contract'
 import { getEvidenceRepository } from '../../utils/evidence-repository'
@@ -36,7 +37,9 @@ export default defineEventHandler(async event => {
       verificationSource: 'manual',
       decisionStabilityBefore: before.decision.bandStability,
       decisionStabilityAfter: after.decision.bandStability,
-      createdAt: verifiedAt
+      createdAt: verifiedAt,
+      // Verifying a synthetic demo room must never enter the production learning pool.
+      demo: request.scan.captureMethod === SYNTHETIC_DEMO_CAPTURE_METHOD
     })
     await repository.addEvidence(evidence)
     const analysis = calculateHomeLensAnalysis(verifiedScan, [...existingEvidence, evidence])

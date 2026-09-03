@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CalibrationAnalysis } from '~~/shared/analysis'
+import { formatCount, formatPercent } from '~~/shared/format'
 
 const props = withDefaults(defineProps<{
   calibration: CalibrationAnalysis | null
@@ -24,12 +25,21 @@ const insight = computed(() => {
     ?? null
 })
 
-const rawPercent = computed(() => Math.round((insight.value?.rawConfidence ?? 0) * 100))
-const calibratedPercent = computed(() => Math.round((insight.value?.calibratedConfidence ?? 0) * 100))
 const qualityLabel = computed(() => {
   const quality = props.calibration?.summary.quality ?? 'insufficient'
   if (quality === 'insufficient') return 'Insufficient'
   return quality.charAt(0).toUpperCase() + quality.slice(1)
+})
+
+const isSynthetic = computed(() => insight.value?.demoEvidence ?? false)
+
+const originLabel = computed(() => {
+  switch (props.calibration?.summary.origin) {
+    case 'synthetic_demo': return 'Synthetic demo history'
+    case 'real_user_verification': return 'Real user verifications'
+    case 'mixed': return 'Mixed synthetic and real'
+    default: return 'No evidence yet'
+  }
 })
 </script>
 
@@ -43,8 +53,8 @@ const qualityLabel = computed(() => {
       @click="open = !open"
     >
       <span>
-        <span id="calibration-title" class="section-label">How sure is the system?</span>
-        <span class="disclosure-hint">Technical confidence details</span>
+        <span id="calibration-title" class="section-label">Calibration details</span>
+        <span class="disclosure-hint">Evidence origin, sample counts and calibration quality</span>
       </span>
       <span class="chevron" aria-hidden="true">{{ open ? '−' : '+' }}</span>
     </button>
@@ -57,28 +67,39 @@ const qualityLabel = computed(() => {
         Calibration is unavailable. Raw model confidence is shown unchanged.
       </p>
       <p v-else-if="!calibration || !insight" class="calibration-fallback">
-        No calibration evidence yet. Raw model confidence is used unchanged.
+        No calibration evidence yet. The original model confidence is used unchanged.
       </p>
       <template v-else>
         <dl class="calibration-figures">
           <div>
             <dt>Model confidence</dt>
-            <dd class="numeric">{{ rawPercent }}%</dd>
+            <dd class="numeric">{{ formatPercent(insight.rawConfidence) }}</dd>
           </div>
           <div>
-            <dt>Calibrated confidence</dt>
-            <dd class="numeric">{{ insight.applied ? `${calibratedPercent}%` : '—' }}</dd>
+            <dt>{{ isSynthetic ? 'Demo-adjusted confidence' : 'Calibrated confidence' }}</dt>
+            <dd class="numeric">{{ insight.applied ? formatPercent(insight.calibratedConfidence) : '—' }}</dd>
           </div>
           <div>
-            <dt>Evidence</dt>
-            <dd class="numeric">{{ insight.sampleCount }} comparable observation{{ insight.sampleCount === 1 ? '' : 's' }}</dd>
+            <dt>Comparable samples</dt>
+            <dd class="numeric">
+              {{ formatCount(insight.sampleCount) }}
+              {{ isSynthetic ? 'synthetic' : 'verified' }}
+            </dd>
+          </div>
+          <div>
+            <dt>Evidence origin</dt>
+            <dd>{{ originLabel }}</dd>
+          </div>
+          <div>
+            <dt>Real verified history</dt>
+            <dd class="numeric">{{ formatCount(calibration.summary.productionEvidenceCount) }}</dd>
           </div>
           <div>
             <dt>Calibration quality</dt>
             <dd>{{ qualityLabel }}</dd>
           </div>
         </dl>
-        <p v-if="insight.demoEvidence" class="demo-label">Demo evidence — synthetic history, not production data.</p>
+        <p v-if="isSynthetic" class="demo-label">Synthetic demo history. It is excluded from production learning.</p>
         <p class="calibration-basis">{{ insight.reason }}</p>
       </template>
     </div>

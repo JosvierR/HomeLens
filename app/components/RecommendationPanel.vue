@@ -2,6 +2,7 @@
 import type { Measurement } from '~/types/scan'
 import type { DecisionConfidenceResult, RecommendationBand, VerificationPriority } from '~~/shared/decision-confidence'
 import type { RescueAction } from '~~/shared/scan-rescue'
+import { formatFeet, formatPercent, formatPercentPoints } from '~~/shared/format'
 
 const props = withDefaults(defineProps<{
   result: DecisionConfidenceResult | null
@@ -99,7 +100,7 @@ const verifyLabel = computed(() => {
 
       <p class="recommendation-copy">
         <template v-if="rescueAction?.status === 'needs_verification'">
-          We're not sure about one measurement. Checking it could make your result much more reliable.
+          The answer changes across plausible measurements, so one value is worth checking.
         </template>
         <template v-else>
           Your result stays the same in
@@ -111,7 +112,7 @@ const verifyLabel = computed(() => {
 
       <div class="stability-block">
         <div class="stability-meta">
-          <span>How reliable is this result?</span>
+          <span>How stable is this result?</span>
           <span class="score-value numeric" data-stability-value>{{ stabilityPercent }}%</span>
         </div>
         <div
@@ -133,7 +134,7 @@ const verifyLabel = computed(() => {
         <p class="action-prompt">
           Check <strong>{{ rescueAction.label?.toLowerCase() }}</strong>
           <template v-if="projectedPercent">
-            — reliability could move from
+            — stability could move from
             <span class="numeric">{{ currentRescuePercent }}%</span> to
             <span class="numeric">{{ projectedPercent }}%</span>.
           </template>
@@ -172,16 +173,16 @@ const verifyLabel = computed(() => {
             @click="technicalOpen = !technicalOpen"
           >How HomeLens decided this</button>
           <div v-show="technicalOpen" id="why-tech-panel" class="tech-panel numeric">
-            <p v-if="priority">Impact score {{ priority.impactPercent.toFixed(1) }}% · priority {{ priority.priorityScore.toFixed(1) }}</p>
-            <p v-if="measurement">Current estimate {{ measurement.value }} {{ measurement.unit }} · confidence {{ Math.round(measurement.confidence * 100) }}%</p>
+            <p v-if="priority">Impact score {{ formatPercentPoints(priority.impactPercent) }} · priority {{ formatPercentPoints(priority.priorityScore) }}</p>
+            <p v-if="measurement">Current estimate {{ formatFeet(measurement.value, measurement.unit) }} · confidence {{ formatPercent(measurement.confidence) }}</p>
             <p>Target stability {{ targetPercent }}% · {{ result.scenarioCount }} scenarios</p>
           </div>
         </div>
       </template>
 
       <div v-else class="stable-state" role="status">
-        <p><strong>Nothing else needs checking right now.</strong></p>
-        <p>{{ rescueAction?.reason || 'Your measurements look consistent enough for this result.' }}</p>
+        <p><strong>Nothing else needs checking.</strong></p>
+        <p>The current result is already stable enough.</p>
       </div>
     </template>
   </section>
