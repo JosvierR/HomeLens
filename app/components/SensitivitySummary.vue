@@ -10,22 +10,21 @@ withDefaults(defineProps<{
   errorMessage: null
 })
 
+const detailsOpen = ref(false)
+
 const bands: RecommendationBand[] = ['compact', 'standard', 'high-capacity']
 
 const bandLabel: Record<RecommendationBand, string> = {
-  compact: 'Band A · Compact',
-  standard: 'Band B · Standard',
-  'high-capacity': 'Band C · High capacity'
+  compact: 'Compact',
+  standard: 'Standard',
+  'high-capacity': 'High capacity'
 }
 </script>
 
 <template>
   <section class="sensitivity" aria-labelledby="sensitivity-title" :aria-busy="pending">
-    <div class="sensitivity-header">
-      <h2 id="sensitivity-title" class="section-label">Scenario sensitivity</h2>
-      <span v-if="result" class="scenario-count numeric">{{ result.scenarioCount }} scenarios</span>
-    </div>
-    <p class="sensitivity-note">Where the planning band lands when every uncertain input is varied together.</p>
+    <h2 id="sensitivity-title" class="section-label">What could change this result?</h2>
+    <p class="sensitivity-note">Where the answer lands when uncertain measurements are varied together.</p>
 
     <div v-if="pending && !result" class="sensitivity-loading">
       <div v-for="index in 3" :key="index" class="skeleton" />
@@ -34,11 +33,20 @@ const bandLabel: Record<RecommendationBand, string> = {
       Scenario analysis is unavailable until the decision engine reconnects.
     </p>
     <p v-else-if="!result" class="sensitivity-fallback">
-      No sensitivity model can be shown without measurements.
+      No scenario results can be shown without measurements.
     </p>
     <template v-else>
+      <div class="current-band">
+        <span>Current planning band</span>
+        <strong>{{ bandLabel[result.expectedBand] }}</strong>
+      </div>
+
       <dl class="distribution">
-        <div v-for="band in bands" :key="band" :class="{ 'distribution--expected': band === result.expectedBand }">
+        <div
+          v-for="band in bands"
+          :key="band"
+          :class="{ 'distribution--expected': band === result.expectedBand }"
+        >
           <dt>{{ bandLabel[band] }}</dt>
           <dd>
             <span class="bar" aria-hidden="true"><i :style="{ width: `${result.bandDistribution[band] * 100}%` }" /></span>
@@ -48,30 +56,48 @@ const bandLabel: Record<RecommendationBand, string> = {
       </dl>
 
       <p v-if="result.verificationQueue[0]" class="driver">
-        <strong>{{ result.verificationQueue[0].label }}</strong> drives most of the remaining spread.
-        {{ result.verificationQueue[0].reason }}
+        <span>Main uncertainty</span>
+        <strong>{{ result.verificationQueue[0].label }}</strong>
       </p>
+
+      <button
+        type="button"
+        class="details-toggle"
+        :aria-expanded="detailsOpen"
+        aria-controls="sensitivity-details"
+        @click="detailsOpen = !detailsOpen"
+      >Show scenario details</button>
+      <div v-show="detailsOpen" id="sensitivity-details" class="details-panel">
+        <p class="numeric">{{ result.scenarioCount }} scenarios · planning index {{ result.baselineIndex }} · likely range {{ result.likelyRange.low }}–{{ result.likelyRange.high }}</p>
+        <p v-if="result.verificationQueue[0]">{{ result.verificationQueue[0].reason }}</p>
+      </div>
     </template>
   </section>
 </template>
 
 <style scoped>
-.sensitivity-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.scenario-count {
-  color: var(--text-tertiary);
-  font-size: 0.77rem;
-}
-
 .sensitivity-note {
   margin: 3px 0 0;
   color: var(--text-tertiary);
   font-size: 0.79rem;
+}
+
+.current-band {
+  margin-top: 14px;
+}
+
+.current-band span {
+  display: block;
+  color: var(--text-tertiary);
+  font-size: 0.76rem;
+}
+
+.current-band strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 1.15rem;
+  font-weight: 620;
+  letter-spacing: -0.02em;
 }
 
 .distribution {
@@ -80,15 +106,15 @@ const bandLabel: Record<RecommendationBand, string> = {
 
 .distribution div {
   display: grid;
-  grid-template-columns: minmax(120px, 190px) minmax(0, 1fr);
+  grid-template-columns: minmax(96px, 140px) minmax(0, 1fr);
   align-items: center;
-  gap: 20px;
+  gap: 16px;
   padding: 6px 0;
 }
 
 .distribution dt {
   color: var(--text-secondary);
-  font-size: 0.82rem;
+  font-size: 0.84rem;
 }
 
 .distribution--expected dt {
@@ -128,18 +154,50 @@ const bandLabel: Record<RecommendationBand, string> = {
 }
 
 .driver {
-  margin: 12px 0 0;
+  margin: 14px 0 0;
   border-top: 1px solid var(--border);
   padding-top: 12px;
-  color: var(--text-secondary);
-  font-size: 0.82rem;
-  line-height: 1.55;
+}
+
+.driver span {
+  display: block;
+  color: var(--text-tertiary);
+  font-size: 0.76rem;
 }
 
 .driver strong {
+  display: block;
+  margin-top: 2px;
   color: var(--text-primary);
+  font-size: 0.92rem;
   font-weight: 600;
 }
+
+.details-toggle {
+  min-height: 40px;
+  margin-top: 8px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.82rem;
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+}
+
+.details-toggle:hover { color: var(--text-primary); }
+
+.details-panel {
+  margin-top: 8px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.details-panel p { margin: 0; }
+.details-panel p + p { margin-top: 6px; }
 
 .sensitivity-fallback {
   margin: 10px 0 0;

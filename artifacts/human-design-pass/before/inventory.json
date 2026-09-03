@@ -1,32 +1,28 @@
 {
   "phase": "before",
-  "baseUrl": "https://homelens-kappa.vercel.app",
+  "baseUrl": "http://127.0.0.1:3000",
   "heights": {
-    "home-desktop": 1620,
-    "scan-desktop": 900,
-    "analysis-desktop": 2053,
-    "home-tablet": 2026,
-    "analysis-tablet": 3168,
-    "home-mobile": 2695,
-    "scan-mobile": 1217,
-    "analysis-mobile": 3955
+    "home-desktop": 1513,
+    "scan-desktop": 905,
+    "analysis-desktop": 1534,
+    "home-tablet": 1508,
+    "analysis-tablet": 2270,
+    "home-mobile": 1791,
+    "scan-mobile": 817,
+    "analysis-mobile": 2705
   },
   "analysisInventory": {
-    "surfaces": 25,
-    "gradients": 2,
-    "pills": 6,
-    "uppercase": 14,
+    "surfaces": 5,
+    "gradients": 0,
+    "pills": 0,
+    "uppercase": 0,
     "radii": {
-      "10px": 5,
-      "18px": 6,
-      "12px": 4,
-      "7px": 3,
+      "8px": 2,
+      "14px": 1,
+      "6px": 9,
       "2px": 7,
-      "9px": 1,
-      "999px": 6,
-      "11px": 2,
-      "8px": 6
+      "10px": 1
     },
-    "shadows": 9
+    "shadows": 2
   }
 }

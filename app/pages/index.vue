@@ -1,18 +1,28 @@
 <script setup lang="ts">
-import { calculateDecisionConfidence } from '~~/shared/decision-confidence'
 import { recommendScanRescue } from '~~/shared/scan-rescue'
 
 const { scan } = useDemoScan()
 const selectedDimension = ref('height')
-const decision = computed(() => calculateDecisionConfidence(scan.value))
 const rescue = computed(() => recommendScanRescue(scan.value))
-const currentPercent = computed(() => Math.round(decision.value.bandStability * 100))
-const projectedPercent = computed(() => Math.round((rescue.value.projectedStability ?? rescue.value.currentStability) * 100))
+const uncertain = computed(() =>
+  scan.value.measurements.find(item => item.id === (rescue.value.measurementId ?? 'height'))
+  ?? scan.value.measurements.find(item => item.confidence < 0.75)
+  ?? scan.value.measurements[0]
+)
 
 const steps = [
-  { title: 'Capture', body: 'Trace the room perimeter. Every detected edge keeps its own confidence and source.' },
-  { title: 'Rank', body: 'Each uncertain input is run through the planning model to see whether it can move the result.' },
-  { title: 'Verify', body: 'Only the input that can change the decision is handed back to a person.' }
+  {
+    title: 'Measure',
+    body: 'Capture the room. Each dimension keeps its own confidence so nothing is hidden.'
+  },
+  {
+    title: 'Understand',
+    body: 'HomeLens checks which uncertain measurement could actually change the result.'
+  },
+  {
+    title: 'Verify only what matters',
+    body: 'You only check the one that can move the outcome — then the rest can wait.'
+  }
 ]
 </script>
 
@@ -22,19 +32,20 @@ const steps = [
 
     <main>
       <section class="hero page-container">
-        <h1>Decision confidence for <span class="keep-together">physical-world</span> measurements.</h1>
+        <p class="brand-mark">HomeLens</p>
+        <h1>Know what actually needs checking.</h1>
         <p class="hero-intro">
-          Physical measurements are never exact. HomeLens works out which uncertain input can actually
-          change a downstream decision, then asks a person to verify only that one.
+          HomeLens looks at uncertain room measurements and tells you which one is worth verifying
+          before it can change the result.
         </p>
         <div class="hero-actions">
-          <NuxtLink to="/scan" class="button">Start scan</NuxtLink>
-          <NuxtLink to="/analysis" class="button button--secondary">Open sample</NuxtLink>
+          <NuxtLink to="/scan" class="button">Scan a room</NuxtLink>
+          <NuxtLink to="/analysis" class="button button--secondary">Try the demo</NuxtLink>
         </div>
       </section>
 
       <section class="preview page-container" aria-labelledby="preview-title">
-        <h2 id="preview-title" class="sr-only">Sample room analysis</h2>
+        <h2 id="preview-title" class="sr-only">Live demo room</h2>
 
         <div class="preview-surface">
           <div class="preview-caption">
@@ -57,7 +68,10 @@ const steps = [
               v-for="measurement in scan.measurements"
               :key="measurement.id"
               type="button"
-              :class="{ 'is-selected': selectedDimension === measurement.id }"
+              :class="{
+                'is-selected': selectedDimension === measurement.id,
+                'is-uncertain': uncertain?.id === measurement.id
+              }"
               :aria-pressed="selectedDimension === measurement.id"
               @click="selectedDimension = measurement.id"
             >
@@ -69,10 +83,9 @@ const steps = [
 
           <NuxtLink to="/analysis" class="preview-next">
             <span v-if="rescue.status === 'needs_verification'">
-              Verify {{ rescue.label?.toLowerCase() }} to raise decision stability from
-              <span class="numeric">{{ currentPercent }}%</span> to <span class="numeric">{{ projectedPercent }}%</span>
+              HomeLens recommendation: Check {{ rescue.label?.toLowerCase() }}
             </span>
-            <span v-else>This decision is stable. No verification is needed.</span>
+            <span v-else>This result looks solid. Nothing needs checking right now.</span>
             <span class="preview-next-cue" aria-hidden="true">→</span>
           </NuxtLink>
         </div>
@@ -83,27 +96,28 @@ const steps = [
         <ol class="workflow-list">
           <li v-for="(step, index) in steps" :key="step.title">
             <span class="step-index numeric">{{ index + 1 }}</span>
-            <span class="step-title">{{ step.title }}</span>
-            <p>{{ step.body }}</p>
+            <div>
+              <span class="step-title">{{ step.title }}</span>
+              <p>{{ step.body }}</p>
+            </div>
+            <span v-if="index < steps.length - 1" class="step-arrow" aria-hidden="true">→</span>
           </li>
         </ol>
-      </section>
-
-      <section class="thesis page-container" aria-labelledby="thesis-title">
-        <h2 id="thesis-title" class="section-label">Why it is built this way</h2>
-        <p>
-          Most measurement tools report one number and drop the error bars. HomeLens keeps uncertainty
-          attached to every estimate, propagates it through the planning model, and treats human
-          verification as a scheduled input rather than a failure state. Verifications feed back as
-          evidence, so the system can check whether its own confidence was trustworthy.
-        </p>
+        <details class="how-details">
+          <summary>How this works</summary>
+          <p>
+            Each measurement keeps an estimate and a confidence score. HomeLens varies the uncertain
+            ones, watches whether the planning result changes, and asks you to verify only the
+            measurement that can move that result.
+          </p>
+        </details>
       </section>
     </main>
 
     <footer class="home-footer">
       <div class="page-container">
         <span>HomeLens</span>
-        <NuxtLink to="/analysis">Open sample analysis</NuxtLink>
+        <NuxtLink to="/analysis">Try the demo</NuxtLink>
       </div>
     </footer>
   </div>
@@ -116,29 +130,32 @@ const steps = [
 }
 
 .hero {
-  padding-block: 56px 28px;
+  padding-block: 48px 24px;
+}
+
+.brand-mark {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
 }
 
 .hero h1 {
-  max-width: 660px;
-  margin: 0;
-  font-size: clamp(1.9rem, 3.6vw, 2.5rem);
+  max-width: 18ch;
+  margin: 10px 0 0;
+  font-size: clamp(2rem, 4vw, 2.75rem);
   font-weight: 620;
-  letter-spacing: -0.038em;
-  line-height: 1.12;
-}
-
-/* Stops the browser breaking the line inside "physical-world". */
-.keep-together {
-  white-space: nowrap;
+  letter-spacing: -0.04em;
+  line-height: 1.08;
 }
 
 .hero-intro {
-  max-width: 560px;
+  max-width: 34rem;
   margin: 14px 0 0;
   color: var(--text-secondary);
-  font-size: 0.97rem;
-  line-height: 1.6;
+  font-size: 1rem;
+  line-height: 1.55;
 }
 
 .hero-actions {
@@ -149,13 +166,9 @@ const steps = [
 }
 
 .hero-actions .button {
-  min-height: 38px;
+  min-height: 42px;
 }
 
-/*
- * The product surface is the largest element on the page. It is also the
- * only place the interface allows a dark, media-weight container.
- */
 .preview-surface {
   overflow: hidden;
   border-radius: var(--radius-media);
@@ -183,7 +196,7 @@ const steps = [
 }
 
 .preview-surface :deep(.geometry svg) {
-  max-height: 440px;
+  max-height: 420px;
 }
 
 .preview-measurements {
@@ -215,6 +228,10 @@ const steps = [
   background: rgb(255 255 255 / 4%);
 }
 
+.preview-measurements button.is-uncertain {
+  box-shadow: inset 0 -2px 0 #d9ae63;
+}
+
 .preview-label {
   color: #8a9895;
   font-size: 0.77rem;
@@ -241,62 +258,78 @@ const steps = [
   border-top: 1px solid rgb(255 255 255 / 8%);
   padding: 14px 16px;
   color: #c3d0cc;
-  font-size: 0.84rem;
+  font-size: 0.88rem;
   line-height: 1.45;
   transition: color 140ms ease;
 }
 
 .preview-next:hover { color: #fff; }
-.preview-next .numeric { color: var(--text-inverse); font-weight: 600; }
 .preview-next-cue { flex: 0 0 auto; }
 
 .workflow {
-  padding-block: 48px 0;
+  padding-block: 44px 56px;
 }
 
 .workflow-list {
+  display: grid;
   margin: 14px 0 0;
   padding: 0;
   list-style: none;
 }
 
 .workflow-list li {
+  position: relative;
   display: grid;
-  grid-template-columns: 24px 116px minmax(0, 1fr);
-  align-items: baseline;
-  gap: 16px;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px 16px;
   border-top: 1px solid var(--border);
-  padding: 14px 0;
+  padding: 16px 0;
 }
 
 .step-index {
   color: var(--text-tertiary);
   font-size: 0.79rem;
+  padding-top: 2px;
 }
 
 .step-title {
-  font-size: 0.92rem;
-  font-weight: 600;
+  display: block;
+  font-size: 0.98rem;
+  font-weight: 620;
 }
 
 .workflow-list p {
-  max-width: 640px;
-  margin: 0;
+  margin: 4px 0 0;
+  max-width: 36rem;
   color: var(--text-secondary);
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   line-height: 1.55;
 }
 
-.thesis {
-  padding-block: 40px 56px;
+.step-arrow {
+  color: var(--text-tertiary);
+  padding-top: 2px;
 }
 
-.thesis p {
-  max-width: 660px;
-  margin: 10px 0 0;
+.how-details {
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
   color: var(--text-secondary);
-  font-size: 0.92rem;
-  line-height: 1.65;
+  font-size: 0.86rem;
+}
+
+.how-details summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+}
+
+.how-details p {
+  max-width: 40rem;
+  margin: 10px 0 0;
+  line-height: 1.55;
 }
 
 .home-footer {
@@ -318,7 +351,7 @@ const steps = [
 .home-footer a:hover { color: var(--text-primary); }
 
 @media (max-width: 700px) {
-  .hero { padding-block: 36px 24px; }
+  .hero { padding-block: 36px 20px; }
   .preview-measurements { grid-template-columns: 1fr; }
 
   .preview-measurements button {
@@ -338,10 +371,9 @@ const steps = [
 
   .workflow-list li {
     grid-template-columns: 24px minmax(0, 1fr);
-    gap: 4px 16px;
   }
 
-  .workflow-list p { grid-column: 2; }
+  .step-arrow { display: none; }
 }
 
 @media (max-width: 400px) {

@@ -26,6 +26,27 @@ const unresolvedMeasurements = computed(() => scan.value.measurements.filter(ite
 }))
 const prioritizedVerification = computed(() => result.value?.verificationQueue ?? [])
 const recommendedMeasurement = computed(() => scan.value.measurements.find(item => item.id === rescueAction.value?.measurementId))
+const recommendedPriority = computed(() =>
+  prioritizedVerification.value.find(item => item.measurementId === rescueAction.value?.measurementId)
+)
+
+const feedbackCopy = computed(() => {
+  if (!lastEvidence.value || !savedMeasurementId.value) return null
+  const before = Math.round(lastEvidence.value.decisionStabilityBefore * 100)
+  const after = Math.round(lastEvidence.value.decisionStabilityAfter * 100)
+  const removedLargest = lastEvidence.value.stabilityGain > 0.05 && after > before
+
+  let detail = `Thanks. Reliability moved from ${before}% to ${after}%.`
+  if (removedLargest) detail = 'That removed the largest source of uncertainty.'
+  else if (after < before) detail = `Thanks. Reliability moved from ${before}% to ${after}%.`
+  else if (after === before) detail = 'Thanks. The reliability stayed about the same.'
+
+  const nextLine = rescueAction.value?.status === 'needs_verification'
+    ? 'The result is still sensitive to one other measurement.'
+    : 'Nothing else needs checking right now.'
+
+  return { detail, nextLine }
+})
 
 const selectMeasurement = (id: string) => { selectedMeasurementId.value = id }
 
@@ -62,11 +83,10 @@ const saveMeasurement = async (id: string, value: number) => {
     lastEvidence.value = response.evidence
     savedMeasurementId.value = id
     clearTimeout(savedTimer)
-    savedTimer = setTimeout(() => { savedMeasurementId.value = null }, 2600)
-    const evidenceMessage = response.evidence.absoluteError > 0.0001
-      ? 'This correction added evidence to the calibration dataset.'
-      : 'This verification added evidence to the calibration dataset.'
-    announcement.value = `${label} saved as a human-verified value. ${evidenceMessage} Decision stability is ${Math.round(response.analysis.decision.bandStability * 100)} percent.`
+    savedTimer = setTimeout(() => { savedMeasurementId.value = null }, 8000)
+    const before = Math.round(response.evidence.decisionStabilityBefore * 100)
+    const after = Math.round(response.evidence.decisionStabilityAfter * 100)
+    announcement.value = `${label} verified. Decision stability moved from ${before} percent to ${after} percent.`
     track('measurement_manually_verified', {
       measurementType: id,
       rawConfidence: response.evidence.estimatedConfidence,
@@ -162,25 +182,49 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
         <div>
           <h1>{{ scan.roomName }}</h1>
           <p class="room-metadata numeric">
-            {{ scan.measurements.length }} measurements ·
-            {{ unresolvedMeasurements.length ? `${unresolvedMeasurements.length} unresolved` : 'all verified' }}
+            Scan complete
+            <span aria-hidden="true">·</span>
+            {{ scan.measurements.length }} measurements
+            <span aria-hidden="true">·</span>
+            <template v-if="unresolvedMeasurements.length">
+              {{ unresolvedMeasurements.length }} worth checking
+            </template>
+            <template v-else>all verified</template>
           </p>
         </div>
         <div class="room-actions">
-          <button type="button" class="button button--ghost button--small" @click="reset">Reset sample</button>
+          <button type="button" class="reset-link" @click="reset">Reset demo</button>
+          <NuxtLink to="/scan" class="button button--secondary button--small">New scan</NuxtLink>
         </div>
       </header>
 
       <p class="sr-only" aria-live="polite" aria-atomic="true">{{ announcement }}</p>
 
-      <p v-if="savedMeasurementId && lastEvidence" class="learning-feedback" role="status">
-        Verification saved. {{ lastEvidence.absoluteError > .0001 ? 'This correction' : 'This verification' }} added evidence to the calibration dataset.
-      </p>
+      <div v-if="feedbackCopy" class="learning-feedback" role="status">
+        <p><strong>Verified.</strong> {{ feedbackCopy.detail }}</p>
+        <p>{{ feedbackCopy.nextLine }}</p>
+      </div>
 
-      <div v-if="scan.measurements.length" class="analysis-layout">
-        <div class="analysis-column">
+      <div v-if="scan.measurements.length" class="analysis-stack">
+        <RecommendationPanel
+          class="recommendation-area"
+          :result="result"
+          :rescue-action="rescueAction"
+          :measurement="recommendedMeasurement"
+          :priority="recommendedPriority"
+          :pending="pending"
+          :error-message="errorMessage"
+          :disabled="pending || verificationPending"
+          @verify="startVerification"
+          @retry="analyze"
+        />
+
+        <div class="evidence-pair">
           <section class="geometry-area" aria-labelledby="geometry-title">
-            <h2 id="geometry-title" class="sr-only">Room geometry</h2>
+            <div class="geometry-heading">
+              <h2 id="geometry-title">Room geometry</h2>
+              <p>Select a dimension to highlight it in the measurements below.</p>
+            </div>
             <RoomGeometry
               :measurements="scan.measurements"
               :windows="scan.windows"
@@ -190,66 +234,63 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
             />
           </section>
 
-          <section class="measurements-area" aria-labelledby="measurements-title">
-            <h2 id="measurements-title" class="section-label">Measurements</h2>
-            <p class="area-note">Editing a value records it as human-verified and recomputes the decision.</p>
-            <MeasurementTable
-              :measurements="scan.measurements"
-              :priorities="prioritizedVerification"
-              :selected-id="selectedMeasurementId"
-              :recommended-id="rescueAction?.status === 'needs_verification' ? rescueAction.measurementId : null"
-              :editing-id="editingMeasurementId"
-              :saving-id="verificationPendingId"
-              :saved-id="savedMeasurementId"
-              :error-id="verificationErrorId"
-              :error-message="verificationError"
-              :disabled="pending || verificationPending"
-              @save="saveMeasurement"
-              @select="selectMeasurement"
-              @edit-state="handleEditState"
-            />
-          </section>
-
-          <SensitivitySummary class="sensitivity-area" :result="result" :pending="pending" :error-message="errorMessage" />
-
-          <CalibrationInsight
-            class="calibration-area"
-            :calibration="calibration"
-            :measurement-id="selectedMeasurementId ?? rescueAction?.measurementId"
-            :pending="pending"
-            :error-message="errorMessage"
-          />
-        </div>
-
-        <div class="analysis-rail">
-          <DecisionStabilityPanel
-            class="stability-area"
-            :result="result"
-            :rescue-action="rescueAction"
-            :pending="pending"
-            :error-message="errorMessage"
-            @retry="analyze"
-          />
-
           <ScanRescuePanel
-            class="rescue-area"
+            class="check-area"
             :action="rescueAction"
             :measurement="recommendedMeasurement"
+            :queue="prioritizedVerification"
+            :selected-id="selectedMeasurementId"
             :pending="pending"
             :error-message="errorMessage"
             :disabled="pending || verificationPending"
             @verify="startVerification"
             @retry="analyze"
-          />
-
-          <VerificationQueue
-            class="queue-area"
-            :items="prioritizedVerification"
-            :selected-id="selectedMeasurementId"
-            :pending="pending"
             @select="selectMeasurement"
           />
         </div>
+
+        <section class="measurements-area" aria-labelledby="measurements-title">
+          <h2 id="measurements-title" class="section-label">Measurements</h2>
+          <p class="area-note">Checking a value marks it as verified and updates the result.</p>
+          <MeasurementTable
+            :measurements="scan.measurements"
+            :priorities="prioritizedVerification"
+            :selected-id="selectedMeasurementId"
+            :recommended-id="rescueAction?.status === 'needs_verification' ? rescueAction.measurementId : null"
+            :editing-id="editingMeasurementId"
+            :saving-id="verificationPendingId"
+            :saved-id="savedMeasurementId"
+            :error-id="verificationErrorId"
+            :error-message="verificationError"
+            :disabled="pending || verificationPending"
+            @save="saveMeasurement"
+            @select="selectMeasurement"
+            @edit-state="handleEditState"
+          />
+        </section>
+
+        <SensitivitySummary
+          class="sensitivity-area"
+          :result="result"
+          :pending="pending"
+          :error-message="errorMessage"
+        />
+
+        <CalibrationInsight
+          class="calibration-area"
+          :calibration="calibration"
+          :measurement-id="selectedMeasurementId ?? rescueAction?.measurementId"
+          :pending="pending"
+          :error-message="errorMessage"
+        />
+
+        <TechnicalDetails
+          class="technical-area"
+          :scan="scan"
+          :result="result"
+          :rescue="rescueAction"
+          :calibration="calibration"
+        />
       </div>
 
       <div v-else class="empty-analysis">
@@ -273,12 +314,13 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
 }
 
 .analysis-main {
-  padding-block: 24px 40px;
+  max-width: 1280px;
+  padding-block: 24px 48px;
 }
 
 .room-header {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
   padding-bottom: 18px;
@@ -293,64 +335,102 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
 }
 
 .room-metadata {
-  margin: 3px 0 0;
+  margin: 4px 0 0;
   color: var(--text-tertiary);
-  font-size: 0.8rem;
+  font-size: 0.82rem;
 }
 
 .room-actions {
   display: flex;
   flex: 0 0 auto;
-  gap: 6px;
+  align-items: center;
+  gap: 10px;
+}
+
+.reset-link {
+  min-height: 32px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 0.8rem;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+}
+
+.reset-link:hover {
+  color: var(--text-secondary);
+  text-decoration-color: var(--border-strong);
 }
 
 .learning-feedback {
-  margin: 0 0 16px;
+  margin: 0 0 18px;
   border-left: 2px solid var(--success);
-  padding-left: 12px;
+  padding: 2px 0 2px 12px;
   color: var(--text-secondary);
-  font-size: 0.81rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
 }
 
-/*
- * Two columns, one vertical rule. The rail holds the decision, the next
- * action and the queue; nothing else earns a place there.
- */
-.analysis-layout {
+.learning-feedback p { margin: 0; }
+.learning-feedback p + p { margin-top: 2px; }
+.learning-feedback strong { color: var(--text-primary); }
+
+.analysis-stack {
   display: grid;
-  grid-template-columns: minmax(0, 1.68fr) minmax(288px, 0.82fr);
+  gap: 28px;
+}
+
+.evidence-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.85fr);
+  gap: 24px;
   align-items: start;
-  gap: 32px;
-}
-
-.analysis-column,
-.analysis-rail {
-  min-width: 0;
-}
-
-.analysis-rail {
-  border-left: 1px solid var(--border);
-  padding-left: 32px;
-}
-
-.analysis-column > section + section,
-.analysis-rail > section + section {
-  margin-top: 22px;
-  border-top: 1px solid var(--border);
-  padding-top: 22px;
 }
 
 .geometry-area {
+  min-width: 0;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-media);
   background: var(--surface);
 }
 
+.geometry-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px 0;
+}
+
+.geometry-heading h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 620;
+  letter-spacing: -0.015em;
+}
+
+.geometry-heading p {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 0.76rem;
+  text-align: right;
+}
+
 .area-note {
   margin: 3px 0 12px;
   color: var(--text-tertiary);
   font-size: 0.79rem;
+}
+
+.sensitivity-area,
+.calibration-area,
+.technical-area {
+  border-top: 1px solid var(--border);
+  padding-top: 22px;
 }
 
 .empty-analysis {
@@ -380,47 +460,46 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
   line-height: 1.55;
 }
 
-@media (max-width: 1000px) {
-  .analysis-layout {
+@media (max-width: 960px) {
+  .evidence-pair {
     grid-template-columns: 1fr;
-    gap: 0;
   }
 
-  /* Flatten both wrappers so the mobile reading order can put the decision
-     and the next action ahead of the measurement workspace. */
-  .analysis-column,
-  .analysis-rail {
-    display: contents;
+  .geometry-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
   }
 
-  .analysis-layout > * > section {
-    margin-top: 22px;
-    border-top: 1px solid var(--border);
-    padding-top: 22px;
+  .geometry-heading p { text-align: left; }
+
+  /* Mobile order: recommendation already first; check panel before geometry */
+  .analysis-stack {
+    display: flex;
+    flex-direction: column;
   }
 
-  .geometry-area {
-    order: 1;
-    margin-top: 0 !important;
-    border: 1px solid var(--border) !important;
-    padding-top: 0 !important;
-  }
-
-  .stability-area { order: 2; }
-  .rescue-area { order: 3; }
-  .measurements-area { order: 4; }
-  .queue-area { order: 5; }
+  .recommendation-area { order: 1; }
+  .evidence-pair { order: 2; display: contents; }
+  .check-area { order: 3; }
+  .geometry-area { order: 4; }
+  .measurements-area { order: 5; }
   .sensitivity-area { order: 6; }
   .calibration-area { order: 7; }
+  .technical-area { order: 8; }
 }
 
 @media (max-width: 600px) {
-  .analysis-main { padding-block: 20px 32px; }
+  .analysis-main { padding-block: 20px 36px; }
 
   .room-header {
-    align-items: flex-start;
     flex-direction: column;
     gap: 14px;
+  }
+
+  .room-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 }
 </style>

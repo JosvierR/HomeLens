@@ -245,7 +245,13 @@ try {
 
   await setViewport(1280, 800)
   await navigate(urlFor('scan'))
-  const scanButtonFound = await evaluate(`Boolean(document.querySelector('.capture-button'))`)
+  await evaluate(`document.querySelector('.demo-scan-button')?.click()`)
+  await pause(300)
+  for (let step = 0; step < 3; step += 1) {
+    await evaluate(`document.querySelector('.capture-step')?.click()`)
+    await pause(500)
+  }
+  const scanButtonFound = await evaluate(`Boolean(document.querySelector('.capture-button')) && !(document.querySelector('.capture-button')?.disabled)`)
   await evaluate(`(() => {
     const button = document.querySelector('.capture-button')
     button?.click()
@@ -253,7 +259,7 @@ try {
   })()`)
   await pause(100)
   const doubleCompletionGuard = await evaluate(`document.querySelector('.capture-button')?.disabled ?? false`)
-  await pause(1_700)
+  await pause(2_000)
   const scanTransition = await evaluate(`({ href: location.href, hasAnalysisHeading: document.querySelector('h1')?.textContent?.includes('Living Room') ?? false })`)
 
   await navigate(urlFor('analysis'))
@@ -300,13 +306,13 @@ try {
   await pause(1_400)
   const navigationPersistence = await evaluate(`document.querySelector('#measurement-height .source')?.textContent?.trim() === 'Verified'`)
 
-  await evaluate(`[...document.querySelectorAll('.room-actions button')].find(button => button.textContent?.includes('Reset'))?.click()`)
+  await evaluate(`[...document.querySelectorAll('.room-actions button, .room-actions .reset-link')].find(button => button.textContent?.includes('Reset'))?.click()`)
   await pause(900)
   const resetState = await evaluate(`({
     value: document.querySelector('#measurement-height .measurement-value')?.textContent?.replace(/\s+/g, ' ').trim() ?? null,
     source: document.querySelector('#measurement-height .source')?.textContent?.trim() ?? null
   })`)
-  await evaluate(`document.querySelector('#measurement-height .edit-button')?.click()`)
+  await evaluate(`document.querySelector('#measurement-height .edit-button, #measurement-height .row-verify')?.click()`)
   await pause(100)
   await evaluate(`(() => {
     const input = document.querySelector('#measurement-input-height')
@@ -374,8 +380,8 @@ try {
   await client.send('Network.setBlockedURLs', { urls: [analysisBlockPattern] })
   await navigate(urlFor('analysis'))
   const unavailableApiState = await evaluate(`({
-    errorVisible: Boolean(document.querySelector('.stability-panel .state-panel--error')),
-    message: document.querySelector('.stability-panel .state-panel--error')?.textContent?.replace(/\\s+/g, ' ').trim() ?? null,
+    errorVisible: Boolean(document.querySelector('.recommendation .state-panel--error, .stability-panel .state-panel--error')),
+    message: document.querySelector('.recommendation .state-panel--error, .stability-panel .state-panel--error')?.textContent?.replace(/\\s+/g, ' ').trim() ?? null,
     roomStillInspectable: Boolean(document.querySelector('.geometry-area'))
   })`)
   const expectedFailureRuntimeIssues = runtimeIssues.slice(normalRuntimeIssues.length)

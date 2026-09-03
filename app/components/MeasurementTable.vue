@@ -42,9 +42,12 @@ const isValid = computed(() => Number.isFinite(parsedValue.value) && parsedValue
 const impactLabel = (id: string) => {
   const impact = priorityFor(id)?.impactPercent ?? 0
   if (impact >= 7) return 'High'
-  if (impact >= 3) return 'Moderate'
+  if (impact >= 3) return 'Medium'
   return 'Low'
 }
+
+const isRecommended = (measurement: Measurement) =>
+  props.recommendedId === measurement.id && measurement.source !== 'manual'
 
 const beginEdit = async (id: string) => {
   if (props.disabled) return
@@ -88,7 +91,7 @@ watch(() => props.savedId, id => {
         <th scope="col" class="align-right">Value</th>
         <th scope="col">Source</th>
         <th scope="col">Confidence</th>
-        <th scope="col" class="align-right">Impact</th>
+        <th scope="col" class="align-right">Decision impact</th>
         <th scope="col"><span class="sr-only">Action</span></th>
       </tr>
     </thead>
@@ -111,7 +114,7 @@ watch(() => props.savedId, id => {
             :aria-label="`Trace ${measurement.label} in the room geometry`"
             @click="emit('select', measurement.id)"
           >{{ measurement.label }}</button>
-          <span v-if="recommendedId === measurement.id && measurement.source !== 'manual'" class="row-flag">Recommended</span>
+          <span v-if="isRecommended(measurement)" class="row-flag">Needs verification</span>
         </th>
 
         <td class="value-cell" data-label="Value">
@@ -168,7 +171,7 @@ watch(() => props.savedId, id => {
               class="button button--small"
               :form="`measurement-form-${measurement.id}`"
               :disabled="!isValid || savingId === measurement.id"
-            >{{ savingId === measurement.id ? 'Saving…' : 'Save' }}</button>
+            >{{ savingId === measurement.id ? 'Saving…' : 'Save verified value' }}</button>
             <button
               type="button"
               class="button button--ghost button--small"
@@ -176,7 +179,15 @@ watch(() => props.savedId, id => {
               @click="cancel(measurement.id)"
             >Cancel</button>
           </div>
-          <span v-else-if="savedId === measurement.id" class="row-saved" role="status">Saved</span>
+          <span v-else-if="savedId === measurement.id" class="row-saved" role="status">Verified</span>
+          <button
+            v-else-if="isRecommended(measurement)"
+            type="button"
+            class="button button--small row-verify"
+            :disabled="disabled"
+            :aria-label="`Check ${measurement.label}`"
+            @click="beginEdit(measurement.id)"
+          >Check</button>
           <button
             v-else
             type="button"
@@ -350,6 +361,10 @@ thead th:last-child { padding-right: 0; }
 .row-saved {
   color: var(--success);
   font-size: 0.79rem;
+}
+
+.row-verify {
+  min-height: 32px;
 }
 
 /* Below the table breakpoint each measurement becomes a labelled block,

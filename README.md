@@ -19,11 +19,11 @@ npm run dev
 
 Open [http://127.0.0.1:3000](http://127.0.0.1:3000). Node.js 22+.
 
-![HomeLens landing page showing a living-room model with per-dimension confidence and the next recommended verification](docs/screenshots/home.png)
+![HomeLens landing page: know what needs checking, with a live room demo and recommendation](docs/screenshots/home.png)
 
-![Simulated room capture with live guidance and a ceiling-height measurement flagged for review](docs/screenshots/scan.png)
+![Room capture with camera permission gate or guided demo views](docs/screenshots/scan.png)
 
-![Analysis page showing the room geometry, a measurement table, decision stability, the recommended verification, and the verification queue](docs/screenshots/analysis.png)
+![Analysis page led by a plain-language recommendation and check action](docs/screenshots/analysis.png)
 
 ## Why this exists
 
