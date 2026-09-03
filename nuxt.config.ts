@@ -27,6 +27,10 @@ export default defineNuxtConfig({
     // Override with NUXT_SUPABASE_SECRET_KEY / NUXT_SUPABASE_URL, or SUPABASE_* aliases.
     supabaseSecretKey: environment.NUXT_SUPABASE_SECRET_KEY || environment.SUPABASE_SECRET_KEY || '',
     supabaseUrl: environment.NUXT_SUPABASE_URL || environment.SUPABASE_URL || '',
+    inferenceApiUrl: environment.NUXT_INFERENCE_API_URL || environment.INFERENCE_API_URL || '',
+    inferenceApiToken: environment.NUXT_INFERENCE_API_TOKEN || environment.INFERENCE_API_TOKEN || '',
+    inferenceCallbackSecret: environment.NUXT_INFERENCE_CALLBACK_SECRET || environment.INFERENCE_CALLBACK_SECRET || '',
+    publicSiteUrl: environment.NUXT_PUBLIC_SITE_URL || environment.PUBLIC_SITE_URL || '',
     public: {
       supabaseUrl: environment.NUXT_PUBLIC_SUPABASE_URL || '',
       supabasePublishableKey: environment.NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '',

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { PHOTO_MEASUREMENT_MODEL_VERSION } from './photo-metric'
 
 export const MAX_MEASUREMENT_VALUE_FEET = 100
 export const REQUIRED_MEASUREMENT_IDS = ['width', 'length', 'height'] as const
@@ -9,7 +10,23 @@ const dimensionValueSchema = z.number().finite().positive().max(MAX_MEASUREMENT_
 export const originalEstimateSchema = z.object({
   value: dimensionValueSchema,
   confidence: confidenceSchema,
-  capturedAt: z.string().datetime({ offset: true }).optional()
+  capturedAt: z.string().datetime({ offset: true }).optional(),
+  uncertaintyLow: dimensionValueSchema.optional(),
+  uncertaintyHigh: dimensionValueSchema.optional(),
+  modelVersion: z.string().trim().min(1).max(120).optional(),
+  supportingEvidenceIds: z.array(z.string().trim().min(1).max(120)).max(20).optional()
+}).strict()
+
+export const measurementProvenanceSchema = z.object({
+  measurementMethod: z.enum(['photo_metric_depth', 'manual', 'simulated_demo']),
+  depthModelVersion: z.string().trim().min(1).max(120).optional(),
+  structureModelVersion: z.string().trim().min(1).max(120).optional(),
+  geometryModelVersion: z.string().trim().min(1).max(120).optional(),
+  confidenceModelVersion: z.string().trim().min(1).max(120).optional(),
+  supportingEvidenceIds: z.array(z.string().trim().min(1).max(120)).max(20),
+  supportingViewCount: z.number().int().min(0).max(20),
+  multiViewConsistency: confidenceSchema.optional(),
+  rawGeometryConfidence: confidenceSchema.optional()
 }).strict()
 
 export const verificationMetadataSchema = z.object({
@@ -21,6 +38,8 @@ export const verificationMetadataSchema = z.object({
 
 export const measurementSchema = z.object({
   id: z.string().trim().min(1).max(80),
+  persistenceId: z.string().uuid().optional(),
+  revision: z.number().int().positive().optional(),
   label: z.string().trim().min(1).max(120),
   value: dimensionValueSchema,
   unit: z.literal('ft'),
@@ -28,6 +47,9 @@ export const measurementSchema = z.object({
   source: z.enum(['estimated', 'manual']),
   rawConfidence: confidenceSchema.optional(),
   calibratedConfidence: confidenceSchema.optional(),
+  uncertaintyLow: dimensionValueSchema.optional(),
+  uncertaintyHigh: dimensionValueSchema.optional(),
+  provenance: measurementProvenanceSchema.optional(),
   originalEstimate: originalEstimateSchema.optional(),
   verification: verificationMetadataSchema.optional()
 }).strict().superRefine((measurement, context) => {
@@ -37,6 +59,15 @@ export const measurementSchema = z.object({
       path: ['confidence'],
       message: 'Manually verified measurements must have confidence 1.'
     })
+  }
+  if ((measurement.uncertaintyLow === undefined) !== (measurement.uncertaintyHigh === undefined)) {
+    context.addIssue({ code: 'custom', path: ['uncertaintyLow'], message: 'Both uncertainty bounds are required together.' })
+  }
+  if (measurement.source === 'estimated' && measurement.uncertaintyLow !== undefined && measurement.uncertaintyLow > measurement.value) {
+    context.addIssue({ code: 'custom', path: ['uncertaintyLow'], message: 'Lower uncertainty bound cannot exceed the value.' })
+  }
+  if (measurement.source === 'estimated' && measurement.uncertaintyHigh !== undefined && measurement.uncertaintyHigh < measurement.value) {
+    context.addIssue({ code: 'custom', path: ['uncertaintyHigh'], message: 'Upper uncertainty bound cannot be below the value.' })
   }
 })
 
@@ -74,6 +105,17 @@ export const roomScanSchema = z.object({
       })
     }
   })
+
+  if (scan.modelVersion === PHOTO_MEASUREMENT_MODEL_VERSION) {
+    scan.measurements.filter(measurement => measurement.source === 'estimated').forEach((measurement, index) => {
+      if (measurement.uncertaintyLow === undefined || measurement.uncertaintyHigh === undefined) {
+        context.addIssue({ code: 'custom', path: ['measurements', index], message: 'Photo estimates require an uncertainty interval.' })
+      }
+      if (measurement.provenance?.measurementMethod !== 'photo_metric_depth' || !measurement.provenance.supportingViewCount) {
+        context.addIssue({ code: 'custom', path: ['measurements', index, 'provenance'], message: 'Photo estimates require supporting-view provenance.' })
+      }
+    })
+  }
 })
 
 export type DecisionMeasurement = z.infer<typeof measurementSchema>
@@ -133,6 +175,14 @@ const bandFor = (value: number): RecommendationBand => {
 
 const uncertaintyFraction = (confidence: number) => (1 - confidence) * 0.29
 
+const uncertaintyBounds = (measurement: DecisionMeasurement, confidence: number) => {
+  if (measurement.uncertaintyLow !== undefined && measurement.uncertaintyHigh !== undefined) {
+    return { low: measurement.uncertaintyLow, high: measurement.uncertaintyHigh }
+  }
+  const spread = uncertaintyFraction(confidence)
+  return { low: measurement.value * (1 - spread), high: measurement.value * (1 + spread) }
+}
+
 const deterministicNoise = (sample: number, salt: number) => {
   const x = Math.sin((sample + 1) * (12.9898 + salt * 17.17)) * 43758.5453
   return (x - Math.floor(x)) * 2 - 1
@@ -169,9 +219,13 @@ export const calculateDecisionConfidence = (
     const overrides: Record<string, number> = {}
     scan.measurements.forEach((measurement, index) => {
       const confidence = measurement.source === 'manual' ? 1 : effectiveConfidence(measurement, confidenceOverrides)
-      const spread = uncertaintyFraction(confidence)
       const noise = deterministicNoise(sample, index + 1)
-      overrides[measurement.id] = measurement.value * (1 + noise * spread)
+      const bounds = measurement.source === 'manual'
+        ? { low: measurement.value, high: measurement.value }
+        : uncertaintyBounds(measurement, confidence)
+      overrides[measurement.id] = noise < 0
+        ? measurement.value + (-noise) * (bounds.low - measurement.value)
+        : measurement.value + noise * (bounds.high - measurement.value)
     })
     const indexValue = planningIndex(scan, overrides)
     samples.push(indexValue)
@@ -191,9 +245,9 @@ export const calculateDecisionConfidence = (
     .map(measurement => {
       const rawConfidence = measurement.rawConfidence ?? measurement.confidence
       const confidence = effectiveConfidence(measurement, confidenceOverrides)
-      const spread = uncertaintyFraction(confidence)
-      const lowIndex = planningIndex(scan, { [measurement.id]: measurement.value * (1 - spread) })
-      const highIndex = planningIndex(scan, { [measurement.id]: measurement.value * (1 + spread) })
+      const bounds = uncertaintyBounds(measurement, confidence)
+      const lowIndex = planningIndex(scan, { [measurement.id]: bounds.low })
+      const highIndex = planningIndex(scan, { [measurement.id]: bounds.high })
       const impactPercent = Math.abs(highIndex - lowIndex) / Math.max(1, baselineIndex)
       const priorityScore = impactPercent * (1 - confidence) * 100
       const calibrationApplied = confidenceOverrides[measurement.id] !== undefined

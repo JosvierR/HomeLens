@@ -10,14 +10,22 @@ interface EvidenceInitResponse {
 export const useCaptureEvidence = () => {
   const { getClient } = useSupabase()
 
+  const hashCameraId = async (cameraId?: string) => {
+    if (!cameraId || !crypto.subtle) return undefined
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(cameraId))
+    return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('')
+  }
+
   const uploadCapture = async (
     frame: CapturedFrame,
     quality: FrameQualityResult,
     context: { scanId: string, projectId: string, deviceFamily: string }
   ) => {
+    const cameraIdHash = await hashCameraId(frame.cameraId)
     const initialized = await $fetch<EvidenceInitResponse>('/api/capture-evidence/init', {
       method: 'POST',
       body: {
+        captureId: frame.captureId,
         scanId: context.scanId,
         projectId: context.projectId,
         targetType: frame.targetType,
@@ -25,6 +33,11 @@ export const useCaptureEvidence = () => {
         widthPx: frame.width,
         heightPx: frame.height,
         byteSize: frame.blob.size,
+        capturedAt: frame.capturedAt,
+        orientation: frame.orientation,
+        cameraIdHash,
+        facingMode: frame.facingMode,
+        estimatedFocalLengthPx: frame.estimatedFocalLengthPx,
         relatedMeasurementIds: []
       }
     })
@@ -43,6 +56,9 @@ export const useCaptureEvidence = () => {
       body: {
         sharpnessScore: quality.sharpnessScore,
         brightnessScore: quality.brightnessScore,
+        contrastScore: quality.contrastScore,
+        shadowClipping: frame.shadowClipping,
+        highlightClipping: frame.highlightClipping,
         qualityBucket: quality.bucket,
         accepted: quality.bucket !== 'recapture_recommended',
         rejectionReason: quality.reason ?? undefined,

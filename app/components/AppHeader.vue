@@ -18,7 +18,7 @@ onMounted(() => { if (configured) refresh() })
       <nav class="header-nav" aria-label="Primary">
         <NuxtLink v-if="configured" to="/projects" class="header-action">Projects</NuxtLink>
         <NuxtLink v-if="configured && !user" to="/auth/sign-in" class="header-action">Sign in</NuxtLink>
-        <NuxtLink v-if="route.path !== '/scan'" to="/scan" class="header-action">New scan</NuxtLink>
+        <NuxtLink v-if="route.path !== '/scan'" to="/projects" class="header-action">New scan</NuxtLink>
       </nav>
     </div>
   </header>

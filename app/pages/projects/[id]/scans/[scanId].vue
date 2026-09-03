@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { RoomScan } from '~/types/scan'
+import type { PhotoEstimationStatusResponse } from '~~/shared/photo-estimation-api'
 
 interface SavedScanPayload {
   scan: Record<string, unknown> & {
@@ -32,8 +33,9 @@ const roomRecord = computed(() => {
 })
 const readyEvidence = computed(() => payload.value?.captureEvidence.filter(item => item.status === 'ready' && item.accepted).length ?? 0)
 const canAnalyze = computed(() => {
-  if (payload.value?.scan.status !== 'completed') return false
-  const keys = new Set(payload.value.measurements.map(item => String(item.measurement_key)))
+  const current = payload.value
+  if (!current || !['estimated', 'ready_for_analysis', 'needs_verification', 'stable', 'completed'].includes(current.scan.status)) return false
+  const keys = new Set(current.measurements.map(item => String(item.measurement_key)))
   return ['width', 'length', 'height'].every(key => keys.has(key))
 })
 
@@ -55,36 +57,20 @@ const load = async () => {
 
 const openAnalysis = async () => {
   if (!payload.value || !canAnalyze.value) return
-  const saved = payload.value
-  const measurements = saved.measurements
-    .filter(row => ['width', 'length', 'height'].includes(String(row.measurement_key)))
-    .map(row => ({
-      id: String(row.measurement_key),
-      label: String(row.label),
-      value: Number(row.accepted_value),
-      unit: 'ft' as const,
-      confidence: Number(row.calibrated_confidence ?? row.raw_confidence ?? 1),
-      rawConfidence: Number(row.raw_confidence ?? 1),
-      source: row.source === 'manual' ? 'manual' as const : 'estimated' as const,
-      originalEstimate: row.original_estimate && Number(row.original_estimate) !== Number(row.accepted_value)
-        ? { value: Number(row.original_estimate), confidence: Number(row.raw_confidence ?? 1) }
-        : undefined
-    }))
-  const restored: RoomScan = {
-    id: saved.scan.id,
-    roomId: saved.scan.room_id,
-    roomName: roomRecord.value?.name ?? 'Saved room',
-    createdAt: saved.scan.created_at,
-    windows: Number(saved.scan.windows_count ?? 0),
-    doors: Number(saved.scan.doors_count ?? 0),
-    measurements,
-    modelVersion: saved.scan.measurement_model_version ?? 'manual-entry-v1',
-    captureMethod: 'camera',
-    deviceFamily: saved.scan.device_family ?? 'web-camera',
-    roomCategory: roomRecord.value?.room_type ?? 'room'
+  try {
+    const status = await $fetch<PhotoEstimationStatusResponse>(`/api/scans/${scanId.value}/estimation`)
+    if (!status.scan) throw new Error('This scan does not have all three supported dimensions.')
+    const restored: RoomScan = {
+      ...status.scan,
+      roomName: roomRecord.value?.name ?? status.scan.roomName,
+      windows: Number(payload.value.scan.windows_count ?? 0),
+      doors: Number(payload.value.scan.doors_count ?? 0)
+    }
+    replaceScan(restored)
+    await navigateTo('/analysis')
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Could not reconstruct this scan.'
   }
-  replaceScan(restored)
-  await navigateTo('/analysis')
 }
 
 onMounted(load)

@@ -2,28 +2,44 @@
 
 ## Moat hypothesis
 
-HomeLens can accumulate proprietary knowledge about:
+### Error Atlas
 
-1. **Error Atlas** — where measurements fail and how wrong they are
-2. **Next Best Capture Policy** — which additional evidence resolves each failure most efficiently
-3. **Ground Truth Loop** — every real correction improves calibration and future evidence acquisition
+Understands where visual measurements fail.
+
+### Confidence Calibration
+
+Learns when model confidence is over/under-stated.
+
+### Next Best Capture Policy
+
+Learns which additional view resolves uncertainty most efficiently.
+
+### Decision Impact
+
+Only spends user effort on uncertainty that can affect the downstream result.
+
+### Ground Truth Loop
+
+Every verified correction strengthens future inference and capture policy.
 
 ```text
 capture context
 → prediction
-→ confidence
-→ requested evidence
-→ correction
-→ actual error
-→ downstream decision impact
+→ uncertainty
+→ decision stability
+→ Next Best Capture
+→ human ground truth
+→ Error Atlas
 → future calibration + capture policy
 ```
 
-The camera is not the moat.
-Supabase is not the moat.
-The decision formula alone is not the moat.
+The monocular depth model is not the moat.
 
-The compounding dataset connecting those steps is the moat **hypothesis**.
+The camera is not the moat.
+
+Supabase is not the moat.
+
+The accumulated mapping from capture context → prediction → uncertainty → intervention → verified error → downstream impact is the moat hypothesis.
 
 ## Why usage can increase value
 

@@ -38,16 +38,23 @@ export default defineEventHandler(async (event) => {
       scan_id: body.scanId,
       project_id: body.projectId,
       target_type: body.targetType,
+      capture_id: body.captureId,
       storage_path: storagePath,
       status: 'uploading',
       mime_type: body.mimeType,
       width_px: body.widthPx,
       height_px: body.heightPx,
       byte_size: body.byteSize,
+      orientation: body.orientation,
+      camera_id_hash: body.cameraIdHash ?? null,
+      facing_mode: body.facingMode ?? null,
+      focal_length_35mm: body.focalLength35mm ?? null,
+      estimated_focal_length_px: body.estimatedFocalLengthPx ?? null,
       capture_method: 'camera',
       accepted: false,
       model_version: MODEL_VERSIONS.measurement,
-      evidence_origin: 'real_user_verification'
+      evidence_origin: 'real_user_verification',
+      captured_at: body.capturedAt
     }).select('*').single()
     if (error) throw error
 

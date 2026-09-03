@@ -2,6 +2,9 @@
 import { analyzeCaptureSession } from '~~/shared/capture-analysis'
 import { assessFrameQuality } from '~~/shared/frame-quality'
 import type { FrameQualityResult } from '~~/shared/frame-quality'
+import type { PhotoEstimationStatusResponse } from '~~/shared/photo-estimation-api'
+import type { FusedPhotoMeasurement } from '~~/shared/photo-metric'
+import type { NextCaptureAction } from '~~/shared/next-best-capture'
 import type { RoomScan } from '~/types/scan'
 import type { CapturedFrame } from '~/composables/useCamera'
 
@@ -11,6 +14,24 @@ interface CapturedView {
   previewUrl: string
   evidenceId?: string
 }
+
+interface GuidanceStep {
+  title: string
+  hint: string
+  feedback: string
+  target: string
+}
+
+type CaptureMode =
+  | 'gate'
+  | 'capturing'
+  | 'uploading'
+  | 'estimating'
+  | 'results'
+  | 'needs_more_evidence'
+  | 'failed'
+  | 'manual'
+  | 'processing'
 
 const router = useRouter()
 const route = useRoute()
@@ -33,17 +54,41 @@ const {
   videoEl
 } = useCamera()
 
-type CaptureMode = 'gate' | 'capturing' | 'details' | 'processing'
+const baseGuidance: GuidanceStep[] = [
+  {
+    title: 'Capture a room overview',
+    hint: 'Stand near a corner. Include the floor and two walls; keep furniture from filling the frame.',
+    feedback: 'Overview accepted.',
+    target: 'room_overview'
+  },
+  {
+    title: 'Move to another corner',
+    hint: 'Do not capture from the same position. Keep the opposite wall and floor edges visible.',
+    feedback: 'Opposite view accepted.',
+    target: 'opposite_corner'
+  },
+  {
+    title: 'Include floor and ceiling geometry',
+    hint: 'Show where two walls meet the floor and ceiling. Avoid pointing directly at a light.',
+    feedback: 'Height view accepted.',
+    target: 'ceiling_edge'
+  }
+]
+
 const mode = ref<CaptureMode>('gate')
+const activeGuidance = ref<GuidanceStep[]>(baseGuidance)
 const guidanceStep = ref(0)
 const microFeedback = ref('')
 const capturedFlash = ref(false)
 const captureBusy = ref(false)
-const usingNativeCamera = ref(false)
 const submitError = ref<string | null>(null)
 const nativeCaptureInput = ref<HTMLInputElement | null>(null)
 const capturedViews = shallowRef<CapturedView[]>([])
+const estimationStatus = shallowRef<PhotoEstimationStatusResponse | null>(null)
+const estimationAttempts = ref(0)
+const pollCount = ref(0)
 const timers: ReturnType<typeof setTimeout>[] = []
+let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const roomName = ref(scan.value.captureMethod === 'simulated-geometry' ? 'Scanned room' : scan.value.roomName)
 const dimensions = reactive({ width: null as number | null, length: null as number | null, height: null as number | null })
@@ -57,28 +102,7 @@ const productContext = computed(() => {
   return projectId && scanId && roomId ? { projectId, scanId, roomId } : null
 })
 
-const guidance = [
-  {
-    title: 'Capture a room overview.',
-    hint: 'Keep the full floor and at least two walls visible.',
-    feedback: 'Overview accepted.',
-    target: 'room_overview'
-  },
-  {
-    title: 'Point toward the opposite corner.',
-    hint: 'Hold the phone still and keep the floor edges in view.',
-    feedback: 'Corner view accepted.',
-    target: 'opposite_corner'
-  },
-  {
-    title: 'Capture the ceiling edge.',
-    hint: 'Include the top of two walls without pointing directly at a light.',
-    feedback: 'Ceiling view accepted.',
-    target: 'ceiling_edge'
-  }
-] as const
-
-const currentGuidance = computed(() => guidance[Math.min(guidanceStep.value, guidance.length - 1)]!)
+const currentGuidance = computed(() => activeGuidance.value[Math.min(guidanceStep.value, activeGuidance.value.length - 1)]!)
 const lastCapturedView = computed(() => capturedViews.value.at(-1) ?? null)
 const captureAssessment = computed(() => analyzeCaptureSession(capturedViews.value.map(view => ({
   targetType: view.frame.targetType,
@@ -87,19 +111,28 @@ const captureAssessment = computed(() => analyzeCaptureSession(capturedViews.val
   sharpnessScore: view.quality.sharpnessScore,
   contrastScore: view.quality.contrastScore
 }))))
+const acceptedBaseCount = computed(() => baseGuidance.filter(step =>
+  capturedViews.value.some(view => view.frame.targetType === step.target)
+).length)
 const showCameraError = computed(() => ['denied', 'unavailable', 'error'].includes(cameraState.value))
-const validMeasurements = computed(() => {
+const estimatedMeasurements = computed(() => estimationStatus.value?.estimate?.measurements ?? [])
+const manualAllowed = computed(() => mode.value === 'failed'
+  || estimationAttempts.value >= 2
+  || estimationStatus.value?.estimate?.status === 'irregular')
+const validManualMeasurements = computed(() => {
   const values = [dimensions.width, dimensions.length, dimensions.height]
   return values.every(value => typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 100)
-    && Number.isInteger(openings.windows) && openings.windows >= 0 && openings.windows <= 100
-    && Number.isInteger(openings.doors) && openings.doors >= 0 && openings.doors <= 100
     && roomName.value.trim().length > 0
 })
 const statusLine = computed(() => {
-  if (mode.value === 'processing') return 'Saving evidence and analyzing scenarios…'
-  if (mode.value === 'details') return 'Camera evidence complete'
-  if (mode.value === 'capturing') return `Live capture · ${capturedViews.value.length} of ${guidance.length} accepted views`
-  return 'Room capture'
+  if (mode.value === 'uploading') return 'Encrypting and uploading accepted views...'
+  if (mode.value === 'estimating') return 'Building metric room geometry...'
+  if (mode.value === 'results') return 'Photo-derived room estimate ready'
+  if (mode.value === 'needs_more_evidence') return 'More evidence is needed'
+  if (mode.value === 'manual') return 'Last-resort physical verification'
+  if (mode.value === 'processing') return 'Saving verified measurements...'
+  if (mode.value === 'capturing') return `Live capture - ${acceptedBaseCount.value} of ${baseGuidance.length} required views`
+  return 'Metric room capture'
 })
 const deviceFamily = computed(() => {
   if (!import.meta.client) return 'web-camera'
@@ -109,10 +142,23 @@ const deviceFamily = computed(() => {
   return 'web-camera'
 })
 
+const errorText = (error: unknown, fallback: string) => {
+  if (error && typeof error === 'object') {
+    const data = 'data' in error ? error.data : undefined
+    if (data && typeof data === 'object' && 'message' in data && typeof data.message === 'string') return data.message
+    if ('message' in error && typeof error.message === 'string') return error.message
+  }
+  return fallback
+}
+
+const clearPoll = () => {
+  if (pollTimer) clearTimeout(pollTimer)
+  pollTimer = undefined
+}
+
 const enableCamera = async () => {
   submitError.value = null
   microFeedback.value = ''
-  usingNativeCamera.value = false
   await startCamera()
   if (cameraState.value !== 'active') return
   mode.value = 'capturing'
@@ -124,10 +170,65 @@ const enableCamera = async () => {
 
 const openNativeCamera = () => {
   submitError.value = null
-  usingNativeCamera.value = true
   stopCamera()
   mode.value = 'capturing'
   nextTick(() => nativeCaptureInput.value?.click())
+}
+
+const pollEstimation = async () => {
+  const context = productContext.value
+  if (!context || mode.value !== 'estimating') return
+  try {
+    const status = await $fetch<PhotoEstimationStatusResponse>(`/api/scans/${context.scanId}/estimation`)
+    estimationStatus.value = status
+    pollCount.value += 1
+    if (status.state === 'processing_geometry' || status.state === 'captured') {
+      if (pollCount.value >= 100) throw new Error('The geometry worker is taking too long. Your private views are saved; retry when the service is available.')
+      pollTimer = setTimeout(pollEstimation, 1500)
+      return
+    }
+    if (status.state === 'failed') {
+      mode.value = 'failed'
+      submitError.value = status.error?.message ?? 'The geometry worker could not complete this scan.'
+      return
+    }
+    mode.value = status.scan && status.estimate?.status === 'estimated' ? 'results' : 'needs_more_evidence'
+  } catch (error) {
+    mode.value = 'failed'
+    submitError.value = errorText(error, 'The estimate could not be loaded. Your accepted views remain saved.')
+  }
+}
+
+const beginPhotoEstimation = async () => {
+  clearPoll()
+  submitError.value = null
+  const context = productContext.value
+  if (!context) {
+    mode.value = 'failed'
+    submitError.value = 'Automatic metric estimation requires a signed-in private project. Create a project, then start its room scan.'
+    return
+  }
+  mode.value = 'uploading'
+  try {
+    await refreshAuth()
+    if (!user.value) throw new Error('Your session expired. Sign in again before processing these views.')
+    for (const view of capturedViews.value) {
+      if (view.evidenceId) continue
+      view.evidenceId = await uploadCapture(view.frame, view.quality, {
+        scanId: context.scanId,
+        projectId: context.projectId,
+        deviceFamily: deviceFamily.value
+      })
+    }
+    await $fetch(`/api/scans/${context.scanId}/estimation/start`, { method: 'POST' })
+    estimationAttempts.value += 1
+    pollCount.value = 0
+    mode.value = 'estimating'
+    await pollEstimation()
+  } catch (error) {
+    mode.value = 'failed'
+    submitError.value = errorText(error, 'Photo estimation is unavailable. Your accepted views are still here.')
+  }
 }
 
 const acceptFrame = (frame: CapturedFrame) => {
@@ -151,22 +252,23 @@ const acceptFrame = (frame: CapturedFrame) => {
   if (existingIndex >= 0) {
     URL.revokeObjectURL(nextViews[existingIndex]!.previewUrl)
     nextViews.splice(existingIndex, 1, nextView)
-  } else {
-    nextViews.push(nextView)
-  }
+  } else nextViews.push(nextView)
   capturedViews.value = nextViews
   capturedFlash.value = true
   microFeedback.value = currentGuidance.value.feedback
   timers.push(setTimeout(() => { capturedFlash.value = false }, 420))
 
-  if (capturedViews.value.length >= guidance.length) {
+  const roundComplete = activeGuidance.value.every(step =>
+    capturedViews.value.some(view => view.frame.targetType === step.target)
+  )
+  if (roundComplete) {
     timers.push(setTimeout(() => {
       stopCamera()
-      mode.value = 'details'
       microFeedback.value = ''
+      void beginPhotoEstimation()
     }, 420))
   } else {
-    guidanceStep.value = capturedViews.value.length
+    guidanceStep.value = Math.min(guidanceStep.value + 1, activeGuidance.value.length - 1)
     timers.push(setTimeout(() => { microFeedback.value = '' }, 900))
   }
   return true
@@ -174,10 +276,7 @@ const acceptFrame = (frame: CapturedFrame) => {
 
 const captureCurrentView = async () => {
   if (captureBusy.value || mode.value !== 'capturing') return
-  if (!stream.value) {
-    openNativeCamera()
-    return
-  }
+  if (!stream.value) return openNativeCamera()
   captureBusy.value = true
   microFeedback.value = ''
   try {
@@ -195,7 +294,7 @@ const handleNativeCapture = async (event: Event) => {
   input.value = ''
   if (!file) return
   captureBusy.value = true
-  microFeedback.value = 'Checking this photo…'
+  microFeedback.value = 'Checking this photo...'
   try {
     const frame = await captureImageFile(file, currentGuidance.value.target)
     if (!frame) microFeedback.value = cameraError.value ?? 'The photo could not be processed.'
@@ -208,7 +307,7 @@ const handleNativeCapture = async (event: Event) => {
 const changeCamera = async () => {
   if (captureBusy.value) return
   captureBusy.value = true
-  microFeedback.value = 'Changing camera…'
+  microFeedback.value = 'Changing camera...'
   try {
     await switchCamera()
     await nextTick()
@@ -219,83 +318,116 @@ const changeCamera = async () => {
   }
 }
 
-const restartCapture = async () => {
+const retakeAll = () => {
+  clearPoll()
   capturedViews.value.forEach(view => URL.revokeObjectURL(view.previewUrl))
   capturedViews.value = []
+  estimationStatus.value = null
+  estimationAttempts.value = 0
+  activeGuidance.value = baseGuidance
   guidanceStep.value = 0
   mode.value = 'gate'
+}
+
+const fallbackCaptureAction = (): Pick<NextCaptureAction, 'targetType' | 'instruction' | 'reason'> => {
+  const missing = estimationStatus.value?.estimate?.missingMeasurements[0]
+  if (missing === 'height') return { targetType: 'ceiling_corner', instruction: 'Capture a ceiling corner.', reason: 'The floor-to-ceiling plane pair needs a clearer view.' }
+  if (missing === 'length') return { targetType: 'far_wall', instruction: 'Capture the far wall.', reason: 'The visible floor depth did not constrain room length.' }
+  return { targetType: 'opposite_corner', instruction: 'Capture the opposite corner again.', reason: 'The parallel wall planes need another viewpoint.' }
+}
+
+const takeRecommendedView = async () => {
+  const recommended = estimationStatus.value?.nextCapture
+  const action = recommended?.kind === 'capture' ? recommended : fallbackCaptureAction()
+  activeGuidance.value = [{
+    title: action.instruction.replace(/\.$/, ''),
+    hint: action.reason,
+    feedback: 'Additional evidence accepted.',
+    target: action.targetType
+  }]
+  guidanceStep.value = 0
+  estimationStatus.value = null
   await enableCamera()
 }
 
-const buildRoomScan = (): RoomScan => {
-  const createdAt = new Date().toISOString()
+const continueToAnalysis = async () => {
   const context = productContext.value
-  return {
-    id: context?.scanId ?? `camera_${crypto.randomUUID()}`,
-    roomId: context?.roomId,
-    roomName: roomName.value.trim(),
-    createdAt,
-    windows: openings.windows,
-    doors: openings.doors,
-    modelVersion: 'manual-entry-v1',
-    captureMethod: 'camera',
-    deviceFamily: deviceFamily.value,
-    roomCategory: 'room',
-    measurements: [
-      { id: 'width', label: 'Width', value: dimensions.width!, unit: 'ft', confidence: 1, rawConfidence: 1, source: 'manual' },
-      { id: 'length', label: 'Length', value: dimensions.length!, unit: 'ft', confidence: 1, rawConfidence: 1, source: 'manual' },
-      { id: 'height', label: 'Ceiling height', value: dimensions.height!, unit: 'ft', confidence: 1, rawConfidence: 1, source: 'manual' }
-    ]
+  const estimatedScan = estimationStatus.value?.scan
+  if (!context || !estimatedScan) return
+  mode.value = 'processing'
+  submitError.value = null
+  try {
+    await $fetch(`/api/scans/${context.scanId}/estimation/accept`, {
+      method: 'POST',
+      body: { roomName: roomName.value.trim(), windows: openings.windows, doors: openings.doors }
+    })
+    replaceScan({ ...estimatedScan, roomName: roomName.value.trim(), windows: openings.windows, doors: openings.doors })
+    track('scan_completed', { measurementCount: 3, unresolvedCount: estimatedScan.measurements.filter(item => item.confidence < .75).length, captureMethod: 'photo_metric_depth' })
+    await router.push('/analysis')
+  } catch (error) {
+    mode.value = 'results'
+    submitError.value = errorText(error, 'The estimate could not be accepted yet.')
   }
 }
 
-const completeCapture = async () => {
-  if (mode.value !== 'details' || !validMeasurements.value || captureAssessment.value.status !== 'ready') return
+const openManualFallback = () => {
+  if (!manualAllowed.value) return
+  dimensions.width = null
+  dimensions.length = null
+  dimensions.height = null
+  mode.value = 'manual'
+  submitError.value = null
+}
+
+const buildManualScan = (): RoomScan => ({
+  id: productContext.value?.scanId ?? `camera_${crypto.randomUUID()}`,
+  roomId: productContext.value?.roomId ?? undefined,
+  roomName: roomName.value.trim(),
+  createdAt: new Date().toISOString(),
+  windows: openings.windows,
+  doors: openings.doors,
+  modelVersion: 'manual-entry-v1',
+  captureMethod: 'camera-manual-fallback',
+  deviceFamily: deviceFamily.value,
+  roomCategory: 'room',
+  measurements: [
+    { id: 'width', label: 'Width', value: dimensions.width!, unit: 'ft', confidence: 1, rawConfidence: 1, source: 'manual' },
+    { id: 'length', label: 'Length', value: dimensions.length!, unit: 'ft', confidence: 1, rawConfidence: 1, source: 'manual' },
+    { id: 'height', label: 'Ceiling height', value: dimensions.height!, unit: 'ft', confidence: 1, rawConfidence: 1, source: 'manual' }
+  ]
+})
+
+const completeManualFallback = async () => {
+  if (!validManualMeasurements.value) return
   mode.value = 'processing'
   submitError.value = null
-  const realScan = buildRoomScan()
+  const manualScan = buildManualScan()
   try {
     const context = productContext.value
     if (context) {
-      await refreshAuth()
-      if (!user.value) throw new Error('Your session expired. Sign in again before saving this scan.')
-      for (const view of capturedViews.value) {
-        if (view.evidenceId) continue
-        view.evidenceId = await uploadCapture(view.frame, view.quality, {
-          scanId: context.scanId,
-          projectId: context.projectId,
-          deviceFamily: deviceFamily.value
-        })
-      }
       await $fetch(`/api/scans/${context.scanId}/complete`, {
         method: 'POST',
         body: {
-          roomName: realScan.roomName,
-          measurements: realScan.measurements.map(measurement => ({
-            key: measurement.id,
-            label: measurement.label,
-            value: measurement.value
-          })),
-          windows: realScan.windows,
-          doors: realScan.doors,
+          roomName: manualScan.roomName,
+          measurements: manualScan.measurements.map(item => ({ key: item.id, label: item.label, value: item.value })),
+          windows: openings.windows,
+          doors: openings.doors,
           deviceFamily: deviceFamily.value,
           acceptedFrameCount: capturedViews.value.length
         }
       })
     }
-
-    replaceScan(realScan)
-    track('scan_completed', {
-      measurementCount: realScan.measurements.length,
-      unresolvedCount: 0,
-      captureMethod: 'camera'
-    })
+    replaceScan(manualScan)
     await router.push('/analysis')
   } catch (error) {
-    mode.value = 'details'
-    submitError.value = error instanceof Error ? error.message : 'The scan could not be saved. Your captured views are still here.'
+    mode.value = 'manual'
+    submitError.value = errorText(error, 'The verified values could not be saved.')
   }
 }
+
+const measurementFor = (type: FusedPhotoMeasurement['measurementType']) =>
+  estimatedMeasurements.value.find(item => item.measurementType === type)
+const displayFeet = (value: number) => value.toFixed(1)
 
 const loadProductRoom = async () => {
   const context = productContext.value
@@ -306,7 +438,7 @@ const loadProductRoom = async () => {
     const exported = await $fetch<{ rooms: Array<{ id: string, name: string }> }>(`/api/projects/${context.projectId}/export`)
     roomName.value = exported.rooms.find(room => room.id === context.roomId)?.name ?? roomName.value
   } catch {
-    // The scan can still continue; the server verifies ownership on every write.
+    // Ownership is checked on every server write; camera capture can still start.
   }
 }
 
@@ -316,9 +448,31 @@ watch(stream, async current => {
   await bindVideo(videoEl.value)
 }, { flush: 'post' })
 
-onMounted(loadProductRoom)
-
+onMounted(async () => {
+  await loadProductRoom()
+  const context = productContext.value
+  if (!context) return
+  try {
+    const status = await $fetch<PhotoEstimationStatusResponse>(`/api/scans/${context.scanId}/estimation`)
+    estimationStatus.value = status
+    if (status.state === 'processing_geometry' || status.state === 'captured') {
+      mode.value = 'estimating'
+      pollCount.value = 0
+      await pollEstimation()
+    } else if (status.state === 'failed') {
+      mode.value = 'failed'
+      submitError.value = status.error?.message ?? 'The geometry worker could not complete this scan.'
+    } else if (status.state === 'needs_more_evidence') {
+      mode.value = 'needs_more_evidence'
+    } else if (status.scan && (status.state === 'estimated' || status.state === 'ready_for_analysis')) {
+      mode.value = 'results'
+    }
+  } catch {
+    // A fresh capture can still start if status restore fails.
+  }
+})
 onBeforeUnmount(() => {
+  clearPoll()
   timers.forEach(timer => clearTimeout(timer))
   stopCamera()
   capturedViews.value.forEach(view => URL.revokeObjectURL(view.previewUrl))
@@ -329,385 +483,168 @@ onBeforeUnmount(() => {
   <main class="scan-page">
     <header class="scan-header">
       <div class="scan-shell scan-header-inner">
-        <NuxtLink :to="productContext ? `/projects/${productContext.projectId}` : '/'" class="back-link">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10 3-5 5 5 5" /></svg>
-          Back
-        </NuxtLink>
-        <div class="room-status">
-          <h1>{{ roomName }}</h1>
-          <p>{{ statusLine }}</p>
-        </div>
-        <div class="progress-readout numeric" aria-live="polite">
-          <template v-if="mode === 'capturing'">{{ capturedViews.length }}/{{ guidance.length }}</template>
-          <template v-else-if="mode === 'details'">Ready</template>
-          <template v-else-if="mode === 'processing'">…</template>
-          <template v-else>Start</template>
-        </div>
+        <NuxtLink :to="productContext ? `/projects/${productContext.projectId}` : '/projects'" class="back-link" aria-label="Back">&#8592; Back</NuxtLink>
+        <div class="room-status"><h1>{{ roomName }}</h1><p>{{ statusLine }}</p></div>
+        <div class="progress-readout numeric" aria-live="polite">{{ acceptedBaseCount }}/3</div>
       </div>
     </header>
 
     <div class="scan-shell scan-content">
       <section v-if="mode === 'gate'" class="permission-gate" aria-labelledby="camera-gate-title">
         <p class="eyebrow">Real camera capture</p>
-        <h2 id="camera-gate-title">See the room through your phone camera.</h2>
-        <p>The live preview uses the rear camera when available. HomeLens captures three still frames and never records audio.</p>
-
-        <div v-if="cameraState === 'requesting_permission'" class="gate-status" role="status">Opening the camera…</div>
-
-        <div v-else-if="showCameraError" class="gate-error" role="alert">
-          <p><strong>{{ cameraError || 'Camera access is blocked.' }}</strong></p>
-          <p>You can retry the live preview or use the phone's native camera below.</p>
+        <h2 id="camera-gate-title">See exactly what your phone camera sees.</h2>
+        <p>The live preview prioritizes the rear camera, supports switching cameras, and falls back to the phone's native camera when needed. HomeLens never records audio.</p>
+        <div v-if="!productContext" class="setup-notice">
+          Automatic metric processing needs a private project scan so images can be sent securely to the GPU worker.
+          <NuxtLink to="/projects">Choose or create a project</NuxtLink>.
         </div>
-
+        <div v-if="cameraState === 'requesting_permission'" class="gate-status" role="status">Opening the camera...</div>
+        <div v-else-if="showCameraError" class="gate-error" role="alert"><strong>{{ cameraError || 'Camera access is blocked.' }}</strong><br>Retry the live preview or use the native camera.</div>
         <div class="gate-actions">
-          <button
-            type="button"
-            class="button"
-            :disabled="cameraState === 'requesting_permission'"
-            @click="enableCamera"
-          >{{ showCameraError ? 'Try live camera again' : 'Open live camera' }}</button>
-          <button type="button" class="button button--secondary native-camera-button" @click="openNativeCamera">
-            Use phone camera
-          </button>
+          <button type="button" class="button" :disabled="cameraState === 'requesting_permission'" @click="enableCamera">{{ showCameraError ? 'Try live camera again' : 'Open live camera' }}</button>
+          <button type="button" class="button button--secondary" @click="openNativeCamera">Use phone camera</button>
         </div>
-        <p class="privacy-note">
-          Anonymous scans stay in this browser session. Signed-in project scans save accepted frames to private storage.
-        </p>
+        <p class="privacy-note">Accepted project images are stored privately and exposed to inference only through short-lived signed URLs.</p>
       </section>
 
       <section v-else-if="mode === 'capturing'" class="capture-workspace" aria-labelledby="capture-surface-title">
         <div class="capture-canvas">
           <div class="canvas-topbar">
-            <span class="live-label"><i aria-hidden="true" /> {{ stream ? (previewReady ? 'Live camera' : 'Starting preview') : 'Phone camera' }}</span>
-            <button
-              v-if="stream && devices.length > 1"
-              type="button"
-              class="camera-switch"
-              :disabled="captureBusy"
-              aria-label="Switch between front and rear cameras"
-              @click="changeCamera"
-            >Switch camera</button>
+            <span class="live-label"><i /> {{ stream ? (previewReady ? 'Live camera' : 'Starting preview') : 'Phone camera' }}</span>
+            <button v-if="stream && devices.length > 1" type="button" class="camera-switch" :disabled="captureBusy" @click="changeCamera">Switch front/rear</button>
           </div>
-
           <h2 id="capture-surface-title" class="sr-only">Live room camera</h2>
-          <video
-            v-show="stream"
-            ref="videoEl"
-            class="camera-video"
-            playsinline
-            muted
-            autoplay
-          />
-          <img
-            v-if="!stream && lastCapturedView"
-            class="camera-video camera-still"
-            :src="lastCapturedView.previewUrl"
-            alt="Most recently accepted room view"
-          >
-          <div v-else-if="!stream" class="camera-placeholder">
-            <span>{{ captureBusy ? 'Checking photo…' : 'Open the phone camera for the next view.' }}</span>
-          </div>
-
-          <div class="frame-corner frame-corner--tl" aria-hidden="true" />
-          <div class="frame-corner frame-corner--tr" aria-hidden="true" />
-          <div class="frame-corner frame-corner--bl" aria-hidden="true" />
-          <div class="frame-corner frame-corner--br" aria-hidden="true" />
+          <video v-show="stream" ref="videoEl" class="camera-video" playsinline muted autoplay />
+          <img v-if="!stream && lastCapturedView" class="camera-video camera-still" :src="lastCapturedView.previewUrl" alt="Most recently accepted room view">
+          <div v-else-if="!stream" class="camera-placeholder">{{ captureBusy ? 'Checking photo...' : 'Open the phone camera for this view.' }}</div>
+          <div class="frame-guide" aria-hidden="true" />
           <div v-if="capturedFlash" class="capture-flash" role="status">View accepted</div>
         </div>
-
         <aside class="capture-guidance">
-          <div class="guidance-main">
-            <p class="guidance-kicker numeric">View {{ guidanceStep + 1 }} of {{ guidance.length }}</p>
+          <div>
+            <p class="guidance-kicker numeric">View {{ guidanceStep + 1 }} of {{ activeGuidance.length }}</p>
             <h2>{{ currentGuidance.title }}</h2>
             <p>{{ currentGuidance.hint }}</p>
             <p v-if="microFeedback" class="micro-feedback" role="status">{{ microFeedback }}</p>
-            <ol class="view-progress" aria-label="Capture progress">
-              <li v-for="(step, index) in guidance" :key="step.target" :class="{ complete: index < capturedViews.length, current: index === guidanceStep }">
-                <span aria-hidden="true">{{ index < capturedViews.length ? '✓' : index + 1 }}</span>
-                {{ step.title.replace('Capture ', '').replace('Point ', '') }}
+            <ol v-if="activeGuidance.length > 1" class="view-progress">
+              <li v-for="(step, index) in activeGuidance" :key="step.target" :class="{ complete: capturedViews.some(view => view.frame.targetType === step.target), current: index === guidanceStep }">
+                <span>{{ capturedViews.some(view => view.frame.targetType === step.target) ? '&#10003;' : index + 1 }}</span>{{ step.title }}
               </li>
             </ol>
           </div>
-
-          <div class="guidance-actions">
-            <button
-              type="button"
-              class="button capture-button"
-              :disabled="captureBusy || (Boolean(stream) && !previewReady)"
-              @click="captureCurrentView"
-            >{{ captureBusy ? 'Checking…' : stream ? 'Capture this view' : 'Open phone camera' }}</button>
-          </div>
+          <button type="button" class="button capture-button" :disabled="captureBusy || (Boolean(stream) && !previewReady)" @click="captureCurrentView">{{ captureBusy ? 'Checking...' : stream ? 'Capture this view' : 'Open phone camera' }}</button>
         </aside>
       </section>
 
-      <section v-else class="details-workspace" aria-labelledby="details-title">
+      <section v-else-if="mode === 'uploading' || mode === 'estimating'" class="processing-panel" aria-live="polite">
+        <div class="spinner" aria-hidden="true" />
+        <p class="eyebrow">{{ mode === 'uploading' ? 'Private upload' : 'Metric geometry' }}</p>
+        <h2>{{ mode === 'uploading' ? 'Securing your accepted views...' : 'Building the room estimate...' }}</h2>
+        <p v-if="mode === 'estimating'">Depth, structural planes, multi-view agreement, and uncertainty are being evaluated. Unsupported dimensions will remain missing.</p>
+        <p v-else>Original images stay private; inference receives time-limited access and does not retain raw depth arrays.</p>
+        <div v-if="estimationStatus" class="job-progress numeric">{{ estimationStatus.progress.completed }} / {{ estimationStatus.progress.total }} views processed</div>
+      </section>
+
+      <section v-else-if="mode === 'results'" class="result-workspace">
         <div class="evidence-summary">
-          <div class="evidence-heading">
-            <div>
-              <p class="eyebrow">Camera evidence</p>
-              <h2 id="details-title">{{ captureAssessment.summary }}</h2>
-            </div>
-            <button v-if="mode !== 'processing'" type="button" class="text-button" @click="restartCapture">Retake views</button>
-          </div>
-
-          <div class="evidence-metrics">
-            <div><strong>{{ capturedViews.length }}/{{ guidance.length }}</strong><span>views accepted</span></div>
-            <div><strong>{{ Math.round(captureAssessment.coverage * 100) }}%</strong><span>required coverage</span></div>
-            <div><strong>{{ Math.round(captureAssessment.qualityScore * 100) }}%</strong><span>visual quality</span></div>
-          </div>
-
+          <div class="section-heading"><div><p class="eyebrow">Camera evidence</p><h2>Three supported dimensions found.</h2></div><button type="button" class="text-button" @click="retakeAll">Retake all</button></div>
           <div class="evidence-strip">
-            <figure v-for="(view, index) in capturedViews" :key="view.frame.targetType">
-              <img :src="view.previewUrl" :alt="`Accepted camera view ${index + 1}`">
-              <figcaption>
-                <span>View {{ index + 1 }}</span>
-                <span>{{ view.quality.bucket === 'good' ? 'Good' : 'Usable' }}</span>
-              </figcaption>
-            </figure>
+            <figure v-for="(view, index) in capturedViews" :key="view.frame.captureId"><img :src="view.previewUrl" :alt="`Accepted room view ${index + 1}`"><figcaption>{{ view.frame.targetType.replaceAll('_', ' ') }}</figcaption></figure>
           </div>
+          <p class="shape-note">Room model: {{ estimationStatus?.estimate?.shape.replaceAll('_', ' ') }} at {{ Math.round((estimationStatus?.estimate?.rectangularityConfidence ?? 0) * 100) }}% rectangularity confidence.</p>
         </div>
-
-        <form class="measurement-form" @submit.prevent="completeCapture">
-          <div>
-            <p class="eyebrow">Real measurements</p>
-            <h2>Enter the values you measured.</h2>
-            <p class="form-intro">Phone photos without depth or a scale reference cannot provide reliable absolute dimensions on every device. These values drive the scenario analysis.</p>
+        <div class="estimate-review">
+          <div><p class="eyebrow">Estimated from captured views</p><h2>Review before analysis.</h2><p class="form-intro">These are model estimates, not tape measurements. Each likely range includes depth quality, plane fit, and disagreement across views.</p></div>
+          <div class="estimate-grid">
+            <article v-for="measurement in estimatedMeasurements" :key="measurement.measurementType">
+              <span>{{ measurement.label }}</span>
+              <strong class="numeric">{{ displayFeet(measurement.valueFeet) }} <small>ft</small></strong>
+              <span class="range numeric">Likely range {{ displayFeet(measurement.uncertaintyLowFeet) }}-{{ displayFeet(measurement.uncertaintyHighFeet) }} ft</span>
+              <span class="support">{{ Math.round(measurement.confidence * 100) }}% confidence - {{ measurement.supportingViewCount }} supporting view{{ measurement.supportingViewCount === 1 ? '' : 's' }}</span>
+            </article>
           </div>
-
-          <label class="field field--wide">
-            <span>Room name</span>
-            <input v-model.trim="roomName" required maxlength="120" autocomplete="off">
-          </label>
-
-          <div class="dimension-fields">
-            <label class="field">
-              <span>Width <small>ft</small></span>
-              <input v-model.number="dimensions.width" type="number" inputmode="decimal" min="0.1" max="100" step="0.1" required placeholder="12.5">
-            </label>
-            <label class="field">
-              <span>Length <small>ft</small></span>
-              <input v-model.number="dimensions.length" type="number" inputmode="decimal" min="0.1" max="100" step="0.1" required placeholder="16.0">
-            </label>
-            <label class="field">
-              <span>Ceiling height <small>ft</small></span>
-              <input v-model.number="dimensions.height" type="number" inputmode="decimal" min="0.1" max="100" step="0.1" required placeholder="9.0">
-            </label>
-          </div>
-
+          <label class="field field--wide"><span>Room name</span><input v-model.trim="roomName" maxlength="120"></label>
           <div class="opening-fields">
-            <label class="field">
-              <span>Windows</span>
-              <input v-model.number="openings.windows" type="number" inputmode="numeric" min="0" max="100" step="1" required>
-            </label>
-            <label class="field">
-              <span>Doors</span>
-              <input v-model.number="openings.doors" type="number" inputmode="numeric" min="0" max="100" step="1" required>
-            </label>
+            <label class="field"><span>Windows <small>optional correction</small></span><input v-model.number="openings.windows" type="number" min="0" max="100" step="1"></label>
+            <label class="field"><span>Doors <small>optional correction</small></span><input v-model.number="openings.doors" type="number" min="0" max="100" step="1"></label>
           </div>
-
+          <div v-if="estimationStatus?.nextCapture?.kind === 'capture'" class="next-capture">
+            <strong>One more view could improve decision stability.</strong><span>{{ estimationStatus.nextCapture.instruction }} {{ estimationStatus.nextCapture.reason }}</span>
+            <button type="button" class="button button--secondary" @click="takeRecommendedView">Take recommended view</button>
+          </div>
           <p v-if="submitError" class="submit-error" role="alert">{{ submitError }}</p>
-          <button type="submit" class="button capture-step" :disabled="mode === 'processing' || !validMeasurements">
-            {{ mode === 'processing' ? 'Saving and analyzing…' : 'Analyze real scan' }}
-          </button>
+          <button type="button" class="button primary-action" :disabled="!roomName.trim()" @click="continueToAnalysis">Continue to scenario analysis</button>
+        </div>
+      </section>
+
+      <section v-else-if="mode === 'needs_more_evidence' || mode === 'failed'" class="recovery-panel">
+        <p class="eyebrow">{{ mode === 'failed' ? 'Processing unavailable' : 'No unsupported guesses' }}</p>
+        <h2>{{ mode === 'failed' ? 'The automatic estimate did not complete.' : 'Another view is needed.' }}</h2>
+        <p>{{ submitError || estimationStatus?.estimate?.reason || 'The images did not support all three dimensions with usable geometry.' }}</p>
+        <p v-if="estimationStatus?.estimate?.missingMeasurements.length"><strong>Still missing:</strong> {{ estimationStatus.estimate.missingMeasurements.map(item => `${item} needs another view`).join(', ') }}.</p>
+        <div v-if="estimatedMeasurements.length" class="partial-list">
+          <span v-for="measurement in estimatedMeasurements" :key="measurement.measurementType">{{ measurement.label }}: {{ displayFeet(measurement.valueFeet) }} ft ({{ Math.round(measurement.confidence * 100) }}%)</span>
+        </div>
+        <div class="recovery-actions">
+          <button v-if="mode === 'needs_more_evidence'" type="button" class="button" @click="takeRecommendedView">Take recommended view</button>
+          <button v-else type="button" class="button" @click="beginPhotoEstimation">Retry automatic estimate</button>
+          <button v-if="manualAllowed" type="button" class="button button--secondary" @click="openManualFallback">Use physical measurements instead</button>
+          <NuxtLink v-if="!productContext" to="/projects" class="button button--secondary">Open projects</NuxtLink>
+          <button type="button" class="text-button" @click="retakeAll">Retake all views</button>
+        </div>
+        <p v-if="!manualAllowed" class="privacy-note">Manual dimensions become available only after the recommended evidence attempt.</p>
+      </section>
+
+      <section v-else class="manual-panel">
+        <p class="eyebrow">Last-resort verification</p>
+        <h2>Enter dimensions measured with a tape or laser.</h2>
+        <p>Do not estimate these values by eye. They will be marked as human ground truth, while any prior model estimate remains in the audit trail.</p>
+        <form @submit.prevent="completeManualFallback">
+          <label class="field field--wide"><span>Room name</span><input v-model.trim="roomName" required maxlength="120"></label>
+          <div class="dimension-fields">
+            <label class="field"><span>Width <small>ft</small></span><input v-model.number="dimensions.width" type="number" inputmode="decimal" min="0.1" max="100" step="0.1" required></label>
+            <label class="field"><span>Length <small>ft</small></span><input v-model.number="dimensions.length" type="number" inputmode="decimal" min="0.1" max="100" step="0.1" required></label>
+            <label class="field"><span>Ceiling height <small>ft</small></span><input v-model.number="dimensions.height" type="number" inputmode="decimal" min="0.1" max="100" step="0.1" required></label>
+          </div>
+          <div class="opening-fields">
+            <label class="field"><span>Windows</span><input v-model.number="openings.windows" type="number" min="0" max="100" step="1"></label>
+            <label class="field"><span>Doors</span><input v-model.number="openings.doors" type="number" min="0" max="100" step="1"></label>
+          </div>
+          <p v-if="submitError" class="submit-error" role="alert">{{ submitError }}</p>
+          <button type="submit" class="button primary-action" :disabled="mode === 'processing' || !validManualMeasurements">{{ mode === 'processing' ? 'Saving...' : 'Analyze verified room' }}</button>
         </form>
       </section>
     </div>
 
-    <input
-      ref="nativeCaptureInput"
-      class="sr-only"
-      type="file"
-      accept="image/*"
-      capture="environment"
-      aria-label="Capture a room photo with the phone camera"
-      @change="handleNativeCapture"
-    >
+    <input ref="nativeCaptureInput" class="sr-only" type="file" accept="image/*" capture="environment" aria-label="Capture a room photo with the phone camera" @change="handleNativeCapture">
   </main>
 </template>
 
 <style scoped>
-.scan-page {
-  min-height: 100vh;
-  background: #0f1615;
-  color: #eef3f1;
-}
-
-.scan-shell {
-  width: min(calc(100% - 40px), 1180px);
-  margin-inline: auto;
-}
-
-.scan-header {
-  border-bottom: 1px solid rgb(255 255 255 / 9%);
-  background: #121918;
-}
-
-.scan-header-inner {
-  display: grid;
-  min-height: 64px;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 20px;
-}
-
-.back-link {
-  display: inline-flex;
-  width: fit-content;
-  min-height: 44px;
-  align-items: center;
-  gap: 6px;
-  color: #aab6b3;
-  font-size: 0.82rem;
-  font-weight: 560;
-}
-
-.back-link:hover { color: #fff; }
-.back-link svg { width: 15px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5; }
-.room-status { min-width: 0; text-align: center; }
-.room-status h1 { margin: 0; overflow: hidden; font-size: 0.9rem; font-weight: 600; letter-spacing: -0.012em; text-overflow: ellipsis; white-space: nowrap; }
-.room-status p { margin: 2px 0 0; color: #8a9895; font-size: 0.76rem; }
-.progress-readout { justify-self: end; color: #8a9895; font-size: 0.8rem; }
-.scan-content { padding-block: 24px 40px; }
-
-.permission-gate {
-  max-width: 36rem;
-  margin: 48px auto 0;
-  padding: 8px 4px 24px;
-}
-
-.eyebrow { margin: 0 0 8px; color: #86b9ae; font-size: 0.72rem; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; }
-.permission-gate h2,
-.evidence-heading h2,
-.measurement-form h2 { margin: 0; font-size: clamp(1.35rem, 3vw, 1.7rem); font-weight: 620; letter-spacing: -0.03em; line-height: 1.2; }
-.permission-gate > p:not(.eyebrow, .privacy-note) { margin: 12px 0 0; color: #9aa8a4; font-size: 0.95rem; line-height: 1.55; }
-.gate-status { margin-top: 20px; color: #9ccfc5; font-size: 0.88rem; }
-.gate-error { margin-top: 18px; border-left: 2px solid #d9ae63; padding-left: 12px; color: #c8d2ce; font-size: 0.9rem; line-height: 1.5; }
-.gate-error p { margin: 0; }
-.gate-error p + p { margin-top: 4px; }
-.gate-error strong { color: #fff; }
-.gate-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
-.gate-actions .button { min-height: 44px; }
-.gate-actions .button--secondary { border-color: #43504d; background: #17201f; color: #eef3f1; }
-.privacy-note { margin: 12px 0 0; color: #71807c; font-size: 0.76rem; line-height: 1.5; }
-
-.capture-workspace {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 310px;
-  gap: 1px;
-  overflow: hidden;
-  border: 1px solid #2d3936;
-  border-radius: var(--radius-media);
-  background: #2d3936;
-}
-
-.capture-canvas {
-  position: relative;
-  min-width: 0;
-  height: min(720px, calc(100svh - 140px));
-  min-height: 460px;
-  overflow: hidden;
-  background: #050807;
-}
-
-.camera-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #050807; }
-.camera-still { object-fit: contain; }
-.camera-placeholder { position: absolute; inset: 0; display: grid; place-items: center; padding: 28px; color: #8d9c98; text-align: center; }
-.canvas-topbar { position: absolute; z-index: 4; top: 14px; left: 14px; right: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; pointer-events: none; }
-.live-label,
-.camera-switch { border: 1px solid rgb(255 255 255 / 14%); border-radius: 999px; padding: 7px 10px; background: rgb(5 8 7 / 78%); color: #d4dfdc; font-size: 0.73rem; backdrop-filter: blur(8px); }
-.live-label { display: inline-flex; align-items: center; gap: 6px; }
-.live-label i { width: 6px; height: 6px; border-radius: 50%; background: #78d0bd; }
-.camera-switch { min-height: 34px; cursor: pointer; pointer-events: auto; }
-.camera-switch:disabled { opacity: 0.5; }
-
-.frame-corner { position: absolute; z-index: 2; width: 34px; height: 34px; border-color: rgb(235 249 245 / 68%); pointer-events: none; }
-.frame-corner--tl { top: 60px; left: 22px; border-top: 2px solid; border-left: 2px solid; }
-.frame-corner--tr { top: 60px; right: 22px; border-top: 2px solid; border-right: 2px solid; }
-.frame-corner--bl { bottom: 22px; left: 22px; border-bottom: 2px solid; border-left: 2px solid; }
-.frame-corner--br { right: 22px; bottom: 22px; border-right: 2px solid; border-bottom: 2px solid; }
-.capture-flash { position: absolute; z-index: 6; top: 50%; left: 50%; border: 1px solid #5a9b8d; border-radius: var(--radius-input); padding: 9px 15px; background: rgb(15 22 21 / 90%); color: #d7eee8; font-size: 0.86rem; transform: translate(-50%, -50%); animation: flash-in 160ms ease-out; }
-
-.capture-guidance { display: flex; min-width: 0; flex-direction: column; padding: 22px 20px 18px; background: #17201f; }
-.guidance-kicker { margin: 0; color: #7d8a86; font-size: 0.74rem; }
-.guidance-main h2 { margin: 8px 0 0; font-size: 1.08rem; font-weight: 600; letter-spacing: -0.018em; line-height: 1.35; }
-.guidance-main > p { margin: 8px 0 0; color: #9aa8a4; font-size: 0.86rem; line-height: 1.55; }
-.micro-feedback { color: #a9ded2 !important; font-weight: 560; }
-.view-progress { display: grid; gap: 9px; margin: 24px 0 0; padding: 18px 0 0; border-top: 1px solid #2b3835; list-style: none; }
-.view-progress li { display: grid; grid-template-columns: 22px 1fr; align-items: start; color: #788682; font-size: 0.76rem; line-height: 1.35; }
-.view-progress li span { display: grid; width: 16px; height: 16px; place-items: center; border: 1px solid #42504d; border-radius: 50%; font-size: 0.62rem; }
-.view-progress li.current { color: #d9e3e0; }
-.view-progress li.complete { color: #94c7bc; }
-.view-progress li.complete span { border-color: #5d9186; }
-.guidance-actions { display: grid; gap: 8px; margin-top: auto; padding-top: 24px; }
-.capture-button { width: 100%; min-height: 46px; background: #e4eeeb; color: #13201d; }
-.capture-button:hover { background: #fff; }
-.capture-button:disabled { opacity: 0.45; }
-
-.details-workspace { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr); overflow: hidden; border: 1px solid #2d3936; border-radius: var(--radius-media); background: #111817; }
-.evidence-summary { min-width: 0; padding: 26px; border-right: 1px solid #2d3936; }
-.evidence-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
-.evidence-heading h2 { max-width: 22ch; font-size: 1.35rem; }
-.text-button { min-height: 34px; border: 0; padding: 0; background: transparent; color: #9ccfc5; cursor: pointer; font-size: 0.8rem; text-decoration: underline; text-underline-offset: 3px; }
-.evidence-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 24px; overflow: hidden; border: 1px solid #2d3936; border-radius: 8px; background: #2d3936; }
-.evidence-metrics div { display: grid; gap: 3px; padding: 13px; background: #17201f; }
-.evidence-metrics strong { font-size: 1.1rem; font-weight: 620; }
-.evidence-metrics span { color: #82908c; font-size: 0.7rem; }
-.evidence-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
-.evidence-strip figure { min-width: 0; margin: 0; overflow: hidden; border: 1px solid #2d3936; border-radius: 8px; background: #17201f; }
-.evidence-strip img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
-.evidence-strip figcaption { display: flex; justify-content: space-between; gap: 8px; padding: 8px; color: #899793; font-size: 0.68rem; }
-.evidence-strip figcaption span:last-child { color: #9ccfc5; }
-
-.measurement-form { display: grid; align-content: start; gap: 18px; min-width: 0; padding: 26px; background: #17201f; }
-.measurement-form h2 { font-size: 1.35rem; }
-.form-intro { margin: 9px 0 0; color: #8f9d99; font-size: 0.82rem; line-height: 1.5; }
-.dimension-fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.opening-fields { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-.field { display: grid; gap: 6px; min-width: 0; color: #b5c1bd; font-size: 0.75rem; }
-.field span { display: flex; justify-content: space-between; gap: 6px; }
-.field small { color: #75837f; font-size: inherit; font-weight: 400; }
-.field input { width: 100%; min-width: 0; min-height: 44px; border: 1px solid #3a4945; border-radius: 8px; padding: 0 11px; background: #101716; color: #f2f6f5; font: inherit; font-size: 0.9rem; }
-.field input:focus { border-color: #78a89e; outline: 2px solid rgb(120 168 158 / 20%); outline-offset: 1px; }
-.submit-error { margin: 0; border-left: 2px solid #d9ae63; padding-left: 10px; color: #e5c991; font-size: 0.8rem; line-height: 1.5; }
-.capture-step { width: 100%; min-height: 46px; }
-
-@keyframes flash-in { from { opacity: 0; transform: translate(-50%, -46%); } }
-
-@media (max-width: 900px) {
-  .capture-workspace,
-  .details-workspace { grid-template-columns: 1fr; }
-  .capture-canvas { height: min(58svh, 560px); min-height: 340px; }
-  .capture-guidance { min-height: 300px; padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
-  .evidence-summary { border-right: 0; border-bottom: 1px solid #2d3936; }
-}
-
-@media (max-width: 580px) {
-  .scan-shell { width: min(calc(100% - 24px), 1180px); }
-  .scan-header-inner { grid-template-columns: auto minmax(0, 1fr) auto; gap: 9px; }
-  .back-link { font-size: 0; }
-  .back-link svg { width: 18px; }
-  .room-status p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .scan-content { padding-block: 12px 28px; }
-  .permission-gate { margin-top: 28px; }
-  .gate-actions { display: grid; }
-  .capture-canvas { width: 100%; height: min(54svh, 460px); min-height: 300px; }
-  .capture-guidance { min-height: 270px; padding: 18px 16px calc(16px + env(safe-area-inset-bottom, 0px)); }
-  .view-progress { margin-top: 18px; padding-top: 14px; }
-  .evidence-summary,
-  .measurement-form { padding: 20px 16px; }
-  .evidence-heading { gap: 12px; }
-  .evidence-metrics { grid-template-columns: 1fr; }
-  .evidence-metrics div { grid-template-columns: auto 1fr; align-items: baseline; gap: 10px; }
-  .evidence-strip { gap: 6px; }
-  .evidence-strip figcaption { display: grid; }
-  .dimension-fields { grid-template-columns: 1fr; }
-}
-
-@media (max-width: 350px) {
-  .scan-shell { width: min(calc(100% - 16px), 1180px); }
-  .evidence-strip { grid-template-columns: 1fr; }
-  .evidence-strip figure { display: grid; grid-template-columns: 120px 1fr; }
-  .evidence-strip img { aspect-ratio: 4 / 3; }
-  .evidence-strip figcaption { align-content: center; }
-}
+.scan-page { min-height: 100vh; background: #0f1615; color: #eef3f1; }
+.scan-shell { width: min(calc(100% - 40px), 1180px); margin-inline: auto; }
+.scan-header { border-bottom: 1px solid rgb(255 255 255 / 9%); background: #121918; }
+.scan-header-inner { display: grid; min-height: 64px; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 20px; }
+.back-link { color: #aab6b3; font-size: .82rem; }.back-link:hover { color: #fff; }
+.room-status { min-width: 0; text-align: center; }.room-status h1 { margin: 0; overflow: hidden; font-size: .9rem; text-overflow: ellipsis; white-space: nowrap; }.room-status p { margin: 2px 0 0; color: #8a9895; font-size: .76rem; }
+.progress-readout { justify-self: end; color: #8a9895; font-size: .8rem; }.scan-content { padding-block: 24px 40px; }
+.eyebrow { margin: 0 0 8px; color: #86b9ae; font-size: .72rem; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+h2 { margin: 0; font-size: clamp(1.35rem, 3vw, 1.75rem); font-weight: 620; letter-spacing: -.03em; line-height: 1.2; }
+.permission-gate,.processing-panel,.recovery-panel,.manual-panel { max-width: 620px; margin: 48px auto 0; }
+.permission-gate>p,.processing-panel>p,.recovery-panel>p,.manual-panel>p { color: #9aa8a4; line-height: 1.55; }
+.setup-notice,.next-capture { margin-top: 18px; border-left: 2px solid #78a89e; padding: 10px 12px; background: #17201f; color: #b8c5c1; font-size: .86rem; line-height: 1.5; }.setup-notice a { color: #a9ded2; text-decoration: underline; }
+.gate-status,.gate-error { margin-top: 18px; color: #d9c083; }.gate-actions,.recovery-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }.privacy-note { color: #71807c !important; font-size: .76rem; }
+.capture-workspace,.result-workspace { display: grid; grid-template-columns: minmax(0,1fr) 330px; gap: 1px; overflow: hidden; border: 1px solid #2d3936; border-radius: var(--radius-media); background: #2d3936; }
+.capture-canvas { position: relative; min-width: 0; height: min(720px,calc(100svh - 140px)); min-height: 460px; overflow: hidden; background: #050807; }
+.camera-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #050807; }.camera-placeholder { position: absolute; inset: 0; display: grid; place-items: center; color: #8d9c98; }
+.canvas-topbar { position: absolute; z-index: 4; top: 14px; right: 14px; left: 14px; display: flex; justify-content: space-between; pointer-events: none; }.live-label,.camera-switch { border: 1px solid rgb(255 255 255 / 15%); border-radius: 999px; padding: 7px 10px; background: rgb(5 8 7 / 78%); color: #d4dfdc; font-size: .73rem; }.live-label i { display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: #78d0bd; }.camera-switch { cursor: pointer; pointer-events: auto; }
+.frame-guide { position: absolute; inset: 12%; z-index: 2; border: 1px solid rgb(235 249 245 / 42%); border-radius: 3px; pointer-events: none; }.capture-flash { position: absolute; z-index: 6; top: 50%; left: 50%; padding: 9px 15px; border: 1px solid #5a9b8d; border-radius: 8px; background: rgb(15 22 21 / 92%); transform: translate(-50%,-50%); }
+.capture-guidance { display: flex; min-width: 0; flex-direction: column; justify-content: space-between; gap: 24px; padding: 22px 20px 18px; background: #17201f; }.guidance-kicker { margin: 0; color: #7d8a86; font-size: .74rem; }.capture-guidance h2 { margin-top: 8px; font-size: 1.15rem; }.capture-guidance p { color: #9aa8a4; font-size: .86rem; line-height: 1.55; }.micro-feedback { color: #a9ded2 !important; }.view-progress { display: grid; gap: 9px; margin: 24px 0 0; padding: 18px 0 0; border-top: 1px solid #2b3835; list-style: none; }.view-progress li { display: grid; grid-template-columns: 22px 1fr; color: #788682; font-size: .76rem; }.view-progress li.current { color: #fff; }.view-progress li.complete { color: #94c7bc; }.capture-button,.primary-action { width: 100%; min-height: 46px; }
+.processing-panel { text-align: center; }.processing-panel p { max-width: 540px; margin-inline: auto; }.spinner { width: 34px; height: 34px; margin: 0 auto 22px; border: 2px solid #40504c; border-top-color: #9ccfc5; border-radius: 50%; animation: spin .8s linear infinite; }.job-progress { margin-top: 18px; color: #86b9ae; font-size: .8rem; }@keyframes spin { to { transform: rotate(360deg); } }
+.result-workspace { grid-template-columns: minmax(0,1.05fr) minmax(390px,.95fr); background: #111817; }.evidence-summary,.estimate-review { min-width: 0; padding: 26px; }.evidence-summary { border-right: 1px solid #2d3936; }.section-heading { display: flex; justify-content: space-between; gap: 18px; }.text-button { min-height: 34px; border: 0; padding: 0; background: transparent; color: #9ccfc5; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.evidence-strip { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 22px; }.evidence-strip figure { min-width: 0; margin: 0; overflow: hidden; border: 1px solid #2d3936; border-radius: 8px; }.evidence-strip img { display: block; width: 100%; aspect-ratio: 4/3; object-fit: cover; }.evidence-strip figcaption { overflow: hidden; padding: 7px; color: #91a09c; font-size: .67rem; text-overflow: ellipsis; white-space: nowrap; }.shape-note,.form-intro { color: #8f9d99; font-size: .8rem; line-height: 1.5; }
+.estimate-review { display: grid; align-content: start; gap: 17px; background: #17201f; }.estimate-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; }.estimate-grid article { display: grid; gap: 3px; padding: 12px; border: 1px solid #34423f; border-radius: 8px; background: #111817; }.estimate-grid article>span:first-child { color: #9ba9a5; font-size: .72rem; }.estimate-grid strong { font-size: 1.25rem; }.estimate-grid small { font-size: .7rem; font-weight: 400; }.range,.support { color: #879590; font-size: .68rem; line-height: 1.35; }.next-capture { display: grid; gap: 6px; margin: 0; }.next-capture .button { margin-top: 4px; }
+.field { display: grid; gap: 6px; color: #b5c1bd; font-size: .75rem; }.field span { display: flex; justify-content: space-between; gap: 6px; }.field small { color: #75837f; }.field input { width: 100%; min-width: 0; min-height: 44px; border: 1px solid #3a4945; border-radius: 8px; padding: 0 11px; background: #101716; color: #f2f6f5; }.opening-fields,.dimension-fields { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; }.dimension-fields { grid-template-columns: repeat(3,1fr); }.manual-panel form { display: grid; gap: 16px; margin-top: 22px; }.submit-error { margin: 0; border-left: 2px solid #d9ae63; padding-left: 10px; color: #e5c991; font-size: .8rem; line-height: 1.5; }.partial-list { display: grid; gap: 5px; color: #a9b6b2; font-size: .85rem; }
+@media (max-width:900px) { .capture-workspace,.result-workspace { grid-template-columns:1fr; }.capture-canvas { height:min(58svh,560px); min-height:340px; }.capture-guidance { min-height:280px; }.evidence-summary { border-right:0; border-bottom:1px solid #2d3936; } }
+@media (max-width:580px) { .scan-shell { width:min(calc(100% - 24px),1180px); }.scan-header-inner { grid-template-columns:auto minmax(0,1fr) auto; gap:9px; }.back-link { font-size:0; }.back-link::first-letter { font-size:1rem; }.scan-content { padding-block:12px 28px; }.permission-gate,.processing-panel,.recovery-panel,.manual-panel { margin-top:28px; }.gate-actions,.recovery-actions { display:grid; }.capture-canvas { height:min(54svh,460px); min-height:300px; }.capture-guidance { min-height:260px; padding:18px 16px calc(16px + env(safe-area-inset-bottom,0px)); }.evidence-summary,.estimate-review { padding:20px 16px; }.evidence-strip { gap:5px; }.estimate-grid,.dimension-fields { grid-template-columns:1fr; }.estimate-grid article { grid-template-columns:1fr auto; }.estimate-grid article strong { grid-row:1/3; grid-column:2; }.opening-fields { grid-template-columns:1fr 1fr; } }
 </style>

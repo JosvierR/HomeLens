@@ -97,4 +97,14 @@ describe('calculateDecisionConfidence', () => {
     expect(height).toMatchObject({ confidence: 0.5, rawConfidence: 0.71, calibratedConfidence: 0.5, calibrationApplied: true })
     expect(scan.measurements[2]?.confidence).toBe(0.71)
   })
+
+  it('uses an explicit photo uncertainty interval instead of deriving a synthetic spread', () => {
+    const candidate = cloneScan()
+    candidate.measurements.forEach(measurement => {
+      measurement.confidence = 0.2
+      measurement.uncertaintyLow = measurement.value
+      measurement.uncertaintyHigh = measurement.value
+    })
+    expect(calculateDecisionConfidence(candidate).bandStability).toBe(1)
+  })
 })

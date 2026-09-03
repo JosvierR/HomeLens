@@ -44,11 +44,24 @@ export const useDemoScan = () => {
     verificationError.value = null
     controller = new AbortController()
     try {
-      const response = await $fetch<ManualVerificationResponse>('/api/measurements/verify', {
-        method: 'POST',
-        body: { scan: scan.value, measurementId: id, verifiedValue: value },
-        signal: controller.signal
-      })
+      const measurement = scan.value.measurements.find(item => item.id === id)
+      const response = measurement?.persistenceId
+        ? await $fetch<ManualVerificationResponse>(`/api/measurements/${measurement.persistenceId}/verify`, {
+            method: 'POST',
+            body: {
+              scanId: scan.value.id,
+              measurementId: measurement.persistenceId,
+              verifiedValue: value,
+              expectedRevision: measurement.revision,
+              idempotencyKey: crypto.randomUUID()
+            },
+            signal: controller.signal
+          })
+        : await $fetch<ManualVerificationResponse>('/api/measurements/verify', {
+            method: 'POST',
+            body: { scan: scan.value, measurementId: id, verifiedValue: value },
+            signal: controller.signal
+          })
       scan.value = response.scan
       lastEvidenceId.value = response.evidence.id
       return response

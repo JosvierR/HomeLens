@@ -7,6 +7,7 @@ export default defineEventHandler((event) => {
     ok: true,
     supabaseConfigured: isSupabaseConfigured(),
     hasSecretKey: Boolean(config.supabaseSecretKey),
+    inferenceConfigured: Boolean(config.inferenceApiUrl && config.inferenceApiToken && config.inferenceCallbackSecret),
     requestId: getRequestId(event)
   }
 })

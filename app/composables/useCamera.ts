@@ -10,6 +10,7 @@ export type CameraLifecycleState =
   | 'stopped'
 
 export interface CapturedFrame {
+  captureId: string
   blob: Blob
   width: number
   height: number
@@ -20,6 +21,10 @@ export interface CapturedFrame {
   contrast: number
   shadowClipping: number
   highlightClipping: number
+  orientation: 'portrait' | 'landscape' | 'square'
+  cameraId?: string
+  facingMode?: string
+  estimatedFocalLengthPx?: number
 }
 
 interface DrawableImage {
@@ -297,7 +302,8 @@ export const useCamera = () => {
 
   const normalizeDrawable = async (
     drawable: DrawableImage,
-    targetType: string
+    targetType: string,
+    metadata: { cameraId?: string, facingMode?: string, estimatedFocalLengthPx?: number } = {}
   ): Promise<CapturedFrame> => {
     const scale = Math.min(1, MAX_EDGE / Math.max(drawable.width, drawable.height, 1))
     const width = Math.max(1, Math.round(drawable.width * scale))
@@ -312,11 +318,14 @@ export const useCamera = () => {
     const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.86))
     if (!blob) throw new Error('Could not encode the captured frame.')
     return {
+      captureId: crypto.randomUUID(),
       blob,
       width,
       height,
       capturedAt: new Date().toISOString(),
       targetType,
+      orientation: width === height ? 'square' : width > height ? 'landscape' : 'portrait',
+      ...metadata,
       ...quality
     }
   }
@@ -353,7 +362,11 @@ export const useCamera = () => {
           release: () => undefined
         }
       }
-      const result = await normalizeDrawable(drawable, targetType)
+      const settings = track?.getSettings()
+      const result = await normalizeDrawable(drawable, targetType, {
+        cameraId: settings?.deviceId,
+        facingMode: settings?.facingMode
+      })
       state.value = 'active'
       errorMessage.value = null
       return result

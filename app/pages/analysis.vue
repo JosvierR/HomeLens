@@ -219,7 +219,7 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
         <div class="room-actions">
           <button v-if="isDemo" type="button" class="reset-link" @click="reset">Reset demo</button>
           <span v-else class="capture-source numeric" aria-label="Analysis source: real camera scan">Camera scan</span>
-          <NuxtLink to="/scan" class="button button--secondary button--small">New scan</NuxtLink>
+          <NuxtLink to="/projects" class="button button--secondary button--small">New scan</NuxtLink>
         </div>
       </header>
 
@@ -330,7 +330,7 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
       <div v-else class="empty-analysis">
         <h2>No measurements yet</h2>
         <p>Complete a room scan to generate measurements.</p>
-        <NuxtLink to="/scan" class="button">Start scan</NuxtLink>
+        <NuxtLink to="/projects" class="button">Start scan</NuxtLink>
       </div>
 
       <p class="model-note">
@@ -338,7 +338,7 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
           This sample uses synthetic measurements to demonstrate scenario analysis. Start a new scan to use your camera and real values.
         </template>
         <template v-else>
-          This result uses the dimensions you entered after the camera evidence passed local quality checks. It does not infer absolute scale from uncalibrated photos.
+          This result uses metric-depth geometry from your accepted camera views. Ranges and confidence reflect model and multi-view uncertainty; manually verified values remain the ground truth.
         </template>
       </p>
     </main>

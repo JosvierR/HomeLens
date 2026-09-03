@@ -13,6 +13,9 @@ erDiagram
   measurements ||--o{ measurement_revisions : history
   scans ||--o{ analysis_snapshots : snapshots
   scans ||--o{ capture_evidence : frames
+  scans ||--o{ image_inference_runs : inference
+  scans ||--o{ measurement_observations : views
+  measurements ||--o{ measurement_observations : fused_from
   capture_evidence }o--o{ measurements : supports
   scans ||--o{ verification_evidence : ground_truth
   scans ||--o{ capture_actions : recommendations
@@ -50,11 +53,23 @@ Signed read URLs are generated on demand and never stored.
 
 Production calibration defaults to `real_user_verification`.
 
+## Photo-metric tables
+
+`image_inference_runs` stores per-view depth/structure status, model versions, quality scores, and processing time. Depth arrays stay out of Postgres.
+
+`measurement_observations` stores one row per view-level width/length/height observation, including uncertainty and geometry residual.
+
+Fused `measurements` add `measurement_method`, original vs accepted values, raw vs calibrated confidence, uncertainty bounds, supporting view count, and model versions.
+
 ## Model versions
 
 Rows persist:
 
 - `measurement_model_version`
+- `depth_model_version`
+- `structure_model_version`
+- `geometry_model_version`
+- `confidence_model_version`
 - `decision_model_version`
 - `calibration_version`
 - `capture_policy_version`

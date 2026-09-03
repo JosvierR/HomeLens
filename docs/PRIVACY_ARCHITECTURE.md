@@ -25,6 +25,9 @@
 - RLS ownership: `auth.uid() = user_id`
 - Private bucket `scan-evidence`
 - Signed read URLs are short-lived and not persisted
+- The GPU worker receives a five-minute signed URL over its authenticated job API
+- Callback payloads are HMAC authenticated; signed URLs never appear in callbacks or database rows
+- Source images and raw depth arrays are processed in memory and discarded by the worker after each job
 
 ## Learning minimization
 

@@ -16,6 +16,7 @@ export const createScanSchema = z.object({
 }).strict()
 
 export const captureEvidenceInitSchema = z.object({
+  captureId: z.string().trim().min(1).max(120),
   scanId: z.string().uuid(),
   projectId: z.string().uuid(),
   targetType: z.string().trim().min(1).max(80),
@@ -23,12 +24,21 @@ export const captureEvidenceInitSchema = z.object({
   widthPx: z.number().int().positive().max(8192),
   heightPx: z.number().int().positive().max(8192),
   byteSize: z.number().int().positive().max(8 * 1024 * 1024),
+  capturedAt: z.string().datetime({ offset: true }),
+  orientation: z.enum(['portrait', 'landscape', 'square']),
+  cameraIdHash: z.string().trim().min(8).max(128).optional(),
+  facingMode: z.string().trim().min(1).max(40).optional(),
+  focalLength35mm: z.number().finite().positive().max(1000).optional(),
+  estimatedFocalLengthPx: z.number().finite().positive().max(100000).optional(),
   relatedMeasurementIds: z.array(z.string().uuid()).max(12).default([])
 }).strict()
 
 export const captureEvidenceCompleteSchema = z.object({
   sharpnessScore: z.number().finite().min(0).max(1).optional(),
   brightnessScore: z.number().finite().min(0).max(1).optional(),
+  contrastScore: z.number().finite().min(0).max(1).optional(),
+  shadowClipping: z.number().finite().min(0).max(1).optional(),
+  highlightClipping: z.number().finite().min(0).max(1).optional(),
   qualityBucket: z.enum(['good', 'usable', 'recapture_recommended']).optional(),
   accepted: z.boolean().default(true),
   rejectionReason: z.string().trim().max(200).optional(),

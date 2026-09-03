@@ -144,12 +144,18 @@ watch(() => props.savedId, id => {
           <span v-else class="measurement-value numeric">
             {{ measurement.value }}<span class="unit">{{ measurement.unit }}</span>
           </span>
+          <span v-if="measurement.source === 'estimated' && measurement.uncertaintyLow !== undefined && measurement.uncertaintyHigh !== undefined" class="uncertainty-range numeric">
+            {{ measurement.uncertaintyLow.toFixed(1) }}-{{ measurement.uncertaintyHigh.toFixed(1) }} {{ measurement.unit }}
+          </span>
           <p v-if="openEditorId === measurement.id && !isValid" class="input-error">Enter a value between 0.1 and 100 ft.</p>
           <p v-if="errorId === measurement.id && errorMessage" class="input-error" role="alert">{{ errorMessage }}</p>
         </td>
 
         <td data-label="Source">
-          <span class="source">{{ measurement.source === 'manual' ? 'Verified' : 'Estimated' }}</span>
+          <span class="source">{{ measurement.source === 'manual' ? 'Verified' : measurement.provenance?.measurementMethod === 'photo_metric_depth' ? 'Metric depth' : 'Estimated' }}</span>
+          <span v-if="measurement.source === 'estimated' && measurement.provenance" class="original-estimate">
+            {{ measurement.provenance.supportingViewCount }} supporting view{{ measurement.provenance.supportingViewCount === 1 ? '' : 's' }}
+          </span>
           <span v-if="measurement.source === 'manual' && measurement.originalEstimate" class="original-estimate numeric">
             was {{ measurement.originalEstimate.value }} {{ measurement.unit }} at {{ Math.round(measurement.originalEstimate.confidence * 100) }}%
           </span>
@@ -277,6 +283,13 @@ thead th:last-child { padding-right: 0; }
   font-size: 0.76rem;
   font-weight: 400;
   letter-spacing: 0;
+}
+
+.uncertainty-range {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
 }
 
 .edit-form {

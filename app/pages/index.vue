@@ -13,7 +13,7 @@ const uncertain = computed(() =>
 const steps = [
   {
     title: 'Measure',
-    body: 'Capture clear room evidence, then enter measured dimensions. Camera photos are never presented as automatic scale.'
+    body: 'Capture three room views. Metric depth and structural geometry estimate supported dimensions with explicit uncertainty.'
   },
   {
     title: 'Understand',
@@ -35,11 +35,11 @@ const steps = [
         <p class="brand-mark">HomeLens</p>
         <h1>Know what actually needs checking.</h1>
         <p class="hero-intro">
-          HomeLens looks at uncertain room measurements and tells you which one is worth verifying
-          before it can change the result.
+          Capture a room with your phone. HomeLens estimates supported dimensions from multiple views,
+          shows a likely range, and asks you to check only the uncertainty that can change the result.
         </p>
         <div class="hero-actions">
-          <NuxtLink to="/scan" class="button">Scan a room</NuxtLink>
+          <NuxtLink to="/projects" class="button">Scan a room</NuxtLink>
           <NuxtLink to="/analysis?demo=1" class="button button--secondary">Try the demo</NuxtLink>
         </div>
       </section>

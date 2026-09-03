@@ -30,7 +30,16 @@ export const applyManualVerification = (
     ...request.scan,
     measurements: request.scan.measurements.map(measurement => ({
       ...measurement,
-      originalEstimate: measurement.originalEstimate ? { ...measurement.originalEstimate } : undefined,
+      originalEstimate: measurement.originalEstimate ? {
+        ...measurement.originalEstimate,
+        supportingEvidenceIds: measurement.originalEstimate.supportingEvidenceIds
+          ? [...measurement.originalEstimate.supportingEvidenceIds]
+          : undefined
+      } : undefined,
+      provenance: measurement.provenance ? {
+        ...measurement.provenance,
+        supportingEvidenceIds: [...measurement.provenance.supportingEvidenceIds]
+      } : undefined,
       verification: measurement.verification ? { ...measurement.verification } : undefined
     }))
   }
@@ -44,7 +53,11 @@ export const applyManualVerification = (
   measurement.originalEstimate ??= {
     value: originalValue,
     confidence: originalConfidence,
-    capturedAt: scan.createdAt
+    capturedAt: scan.createdAt,
+    uncertaintyLow: measurement.uncertaintyLow,
+    uncertaintyHigh: measurement.uncertaintyHigh,
+    modelVersion: scan.modelVersion,
+    supportingEvidenceIds: measurement.provenance?.supportingEvidenceIds
   }
   measurement.rawConfidence = originalConfidence
   measurement.value = request.verifiedValue

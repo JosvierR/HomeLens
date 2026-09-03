@@ -3,15 +3,16 @@ import { requireUser } from '../../../utils/require-user'
 import { persistVerifySchema } from '~~/shared/persistence-contracts'
 import { calculateHomeLensAnalysis } from '~~/shared/analysis'
 import { roomScanSchema } from '~~/shared/decision-confidence'
-import { DEFAULT_CALIBRATION_TOLERANCE } from '~~/shared/calibration'
+import { DEFAULT_CALIBRATION_TOLERANCE, recordEvidence } from '~~/shared/calibration'
 import { MODEL_VERSIONS, PRODUCTION_EVIDENCE_ORIGIN } from '~~/shared/model-versions'
 import { getRequestId, logServerEvent } from '../../../utils/observability'
-import { getEvidenceRepository } from '../../../utils/evidence-repository'
+import { SupabaseEvidenceRepository } from '../../../services/supabase-evidence-repository'
 
 const toDecisionScan = (
   scanRow: Record<string, unknown>,
   roomName: string,
-  measurements: Array<Record<string, unknown>>
+  measurements: Array<Record<string, unknown>>,
+  observations: Array<Record<string, unknown>> = []
 ) => roomScanSchema.parse({
   id: scanRow.id,
   roomId: scanRow.room_id,
@@ -19,10 +20,12 @@ const toDecisionScan = (
   createdAt: scanRow.created_at,
   modelVersion: scanRow.measurement_model_version,
   captureMethod: scanRow.capture_mode,
-  windows: 0,
-  doors: 0,
+  windows: Number(scanRow.windows_count ?? 0),
+  doors: Number(scanRow.doors_count ?? 0),
   measurements: measurements.map(item => ({
     id: item.measurement_key,
+    persistenceId: item.id,
+    revision: item.revision,
     label: item.label,
     value: item.accepted_value,
     unit: 'ft',
@@ -30,10 +33,31 @@ const toDecisionScan = (
     source: item.source,
     rawConfidence: item.raw_confidence,
     calibratedConfidence: item.calibrated_confidence ?? undefined,
+    uncertaintyLow: item.uncertainty_low ?? undefined,
+    uncertaintyHigh: item.uncertainty_high ?? undefined,
+    provenance: item.measurement_method ? {
+      measurementMethod: item.measurement_method,
+      depthModelVersion: item.depth_model_version ?? undefined,
+      structureModelVersion: item.structure_model_version ?? undefined,
+      geometryModelVersion: item.geometry_model_version ?? undefined,
+      confidenceModelVersion: item.confidence_model_version ?? undefined,
+      supportingEvidenceIds: observations
+        .filter(observation => observation.measurement_type === item.measurement_key)
+        .map(observation => String(observation.capture_evidence_id)),
+      supportingViewCount: Number(item.supporting_view_count ?? 0),
+      multiViewConsistency: item.multi_view_consistency ?? undefined,
+      rawGeometryConfidence: item.raw_geometry_confidence ?? undefined
+    } : undefined,
     originalEstimate: {
       value: item.original_estimate,
       confidence: item.raw_confidence,
-      capturedAt: item.created_at
+      capturedAt: item.created_at,
+      uncertaintyLow: item.uncertainty_low ?? undefined,
+      uncertaintyHigh: item.uncertainty_high ?? undefined,
+      modelVersion: item.model_version ?? undefined,
+      supportingEvidenceIds: observations
+        .filter(observation => observation.measurement_type === item.measurement_key)
+        .map(observation => String(observation.capture_evidence_id))
     },
     verification: item.verified_at
       ? {
@@ -92,10 +116,18 @@ export default defineEventHandler(async (event) => {
       .eq('scan_id', body.scanId)
     if (listError) throw listError
 
+    const { data: observations, error: observationError } = await supabase
+      .from('measurement_observations')
+      .select('*')
+      .eq('scan_id', body.scanId)
+      .eq('user_id', user.id)
+    if (observationError) throw observationError
+
     const room = await supabase.from('rooms').select('name').eq('id', scanRow.room_id).maybeSingle()
-    const beforeScan = toDecisionScan(scanRow, room.data?.name ?? 'Room', allMeasurements ?? [])
-    const demoRepo = getEvidenceRepository()
-    const beforeAnalysis = calculateHomeLensAnalysis(beforeScan, await demoRepo.listEvidence())
+    const beforeScan = toDecisionScan(scanRow, room.data?.name ?? 'Room', allMeasurements ?? [], observations ?? [])
+    const evidenceRepo = new SupabaseEvidenceRepository(supabase)
+    const historicalEvidence = await evidenceRepo.listEvidence()
+    const beforeAnalysis = calculateHomeLensAnalysis(beforeScan, historicalEvidence)
 
     const previousValue = measurement.accepted_value
     const previousSource = measurement.source
@@ -136,8 +168,18 @@ export default defineEventHandler(async (event) => {
     })
 
     const refreshed = (allMeasurements ?? []).map(item => item.id === measurementId ? updated : item)
-    const afterScan = toDecisionScan(scanRow, room.data?.name ?? 'Room', refreshed)
-    const afterAnalysis = calculateHomeLensAnalysis(afterScan, await demoRepo.listEvidence())
+    const afterScan = toDecisionScan(scanRow, room.data?.name ?? 'Room', refreshed, observations ?? [])
+    const afterAnalysis = calculateHomeLensAnalysis(afterScan, historicalEvidence)
+
+    const measurementObservations = (observations ?? []).filter(item => item.measurement_type === measurement.measurement_key)
+    const supportingEvidenceIds = measurementObservations.map(item => item.capture_evidence_id)
+    const { data: captureRows, error: captureError } = supportingEvidenceIds.length
+      ? await supabase.from('capture_evidence').select('id, target_type').in('id', supportingEvidenceIds)
+      : { data: [], error: null }
+    if (captureError) throw captureError
+    const average = (values: number[]) => values.length
+      ? values.reduce((total, value) => total + value, 0) / values.length
+      : null
 
     const { data: evidence, error: evidenceError } = await supabase.from('verification_evidence').insert({
       user_id: user.id,
@@ -162,7 +204,17 @@ export default defineEventHandler(async (event) => {
       decision_model_version: MODEL_VERSIONS.decision,
       calibration_version: MODEL_VERSIONS.calibration,
       evidence_origin: PRODUCTION_EVIDENCE_ORIGIN,
-      idempotency_key: body.idempotencyKey
+      idempotency_key: body.idempotencyKey,
+      depth_confidence: average(measurementObservations.map(item => Number(item.depth_quality))),
+      plane_fit_residual: average(measurementObservations.map(item => Number(item.geometry_fit_error))),
+      supporting_view_count: measurement.supporting_view_count ?? measurementObservations.length,
+      multi_view_disagreement: measurement.multi_view_consistency == null ? null : 1 - Number(measurement.multi_view_consistency),
+      image_quality: average(measurementObservations.map(item => Number(item.image_quality))),
+      capture_targets: (captureRows ?? []).map(item => item.target_type),
+      depth_model_version: measurement.depth_model_version,
+      structure_model_version: measurement.structure_model_version,
+      geometry_model_version: measurement.geometry_model_version,
+      confidence_model_version: measurement.confidence_model_version
     }).select('*').single()
     if (evidenceError) {
       if (evidenceError.code === '23505') {
@@ -198,9 +250,28 @@ export default defineEventHandler(async (event) => {
       scanId: body.scanId
     })
 
+    const normalizedEvidence = recordEvidence({
+      id: evidence.id,
+      scanId: body.scanId,
+      roomId: String(scanRow.room_id),
+      measurementId: String(measurement.measurement_key),
+      measurementType: String(measurement.measurement_key),
+      estimatedValue: Number(measurement.original_estimate),
+      estimatedConfidence: Number(measurement.raw_confidence),
+      verifiedValue: body.verifiedValue,
+      modelVersion: String(measurement.model_version ?? MODEL_VERSIONS.measurement),
+      captureMethod: String(scanRow.capture_mode ?? 'camera'),
+      deviceFamily: scanRow.device_family ? String(scanRow.device_family) : undefined,
+      verificationSource: 'manual',
+      decisionStabilityBefore: beforeAnalysis.decision.bandStability,
+      decisionStabilityAfter: afterAnalysis.decision.bandStability,
+      createdAt: evidence.created_at
+    })
+
     return {
+      scan: afterScan,
       measurement: updated,
-      evidence,
+      evidence: normalizedEvidence,
       analysis: afterAnalysis,
       requestId: getRequestId(event)
     }

@@ -3,69 +3,64 @@
 ## Product modes
 
 - **Demo** — anonymous, synthetic/local scan, no permanent Storage.
-- **Product** — authenticated Supabase persistence, private evidence, learning loop.
+- **Product** — authenticated project, private evidence, asynchronous GPU inference, durable provenance, and learning from human correction.
 
-## Domain boundaries
-
-### Capture
-
-Browser camera (`useCamera`) collects useful frames after intentional permission, prefers the rear camera, and falls back to the phone's native camera picker when live preview is unavailable.
-Local resolution, exposure, blur, contrast, and clipping checks normalize frames through an EXIF-stripping canvas.
-Camera evidence does **not** invent absolute dimensions. Cross-device web capture pairs accepted frames with explicit measured inputs before decision analysis.
-
-### Measurement
-
-Accepted state is separate from immutable `original_estimate` / `raw_confidence`.
-
-### Calibration / Error Atlas
-
-Pure math in `shared/calibration.ts`.
-Durable evidence via `verification_evidence` + profile aggregates.
-Service: `server/services/error-atlas.ts`.
-
-### Decision confidence
-
-Unchanged deterministic engine in `shared/decision-confidence.ts`.
-
-### Scan Rescue + Next Best Capture
-
-Rescue ranks verifications.
-`shared/next-best-capture.ts` ranks additional capture targets with a transparent utility formula and an explicit STOP rule.
-
-### Persistence
+## Production path
 
 ```text
-Browser
-  → Nuxt UI + Camera
-  → Private Supabase Storage (scan-evidence)
-  → Nitro APIs (session via @supabase/ssr cookies)
-  → Postgres + RLS
-  → Decision / Calibration / Next Best Capture engines
+Mobile Browser
+     ↓
+Real Camera
+     ↓
+Private Supabase Storage
+     ↓
+Nuxt / Nitro
+     ↓
+Signed Inference Request
+     ↓
+GPU Worker
+     ↓
+Metric Depth
+     ↓
+Structural Geometry
+     ↓
+Multi-View Fusion
+     ↓
+Measurement + Uncertainty
+     ↓
+Supabase Postgres
+     ↓
+Decision Confidence
+     ↓
+Next Best Capture / Scan Rescue
+     ↓
+Human Verification
+     ↓
+Error Atlas
 ```
 
-```mermaid
-flowchart TD
-  UI[Nuxt UI] --> Cam[Real camera frames]
-  Cam --> Store[Private Supabase Storage]
-  UI --> API[Nitro APIs]
-  API --> Auth[Supabase Auth session]
-  Auth --> DB[(Postgres + RLS)]
-  Store --> DB
-  API --> Engines[Decision + Calibration + NBC]
-  Engines --> Atlas[Error Atlas aggregates]
-  Atlas --> Engines
-```
+Vercel/Nitro coordinates jobs but does not run the GPU model. The frontend never receives a depth array or an inference signed URL.
 
-## Client packages
+## Confidence and uncertainty
 
-- `@supabase/ssr` — browser + Nitro cookie sessions (official SSR guidance)
-- `@supabase/supabase-js` — Storage upload/download helpers
+Each view-level confidence combines depth quality, structural confidence, plane-fit quality, image quality, camera distance, occlusion, and geometry completeness with a weighted geometric mean. Fusion then incorporates observation confidence, supporting-view count, and multi-view consistency. The displayed interval is the widest of within-view uncertainty, cross-view spread, and a confidence penalty. Historical Error Atlas evidence may calibrate the raw value; raw confidence is never overwritten.
 
-Publishable key only in `NUXT_PUBLIC_*`.
-Secret key optional server-only for privileged jobs.
+This is an explicit heuristic confidence model until a real benchmark dataset is large enough for empirical calibration. Values are not certified measurements.
 
-## Prototype limitations that remain
+## Structural scope
 
-Planning bands and tolerances are illustrative.
-Camera frames are evidence, not a validated CV measurement pipeline.
-Local Supabase requires Docker Desktop; remote project must be linked for production.
+Version 1 supports rectangular and near-rectangular rooms only. The structure provider uses transparent depth-region heuristics and plane consistency; it does not use a general vision-language model. A room that does not support a rectangular model is flagged instead of receiving forced width and length values. Opening detection is not yet reliable in the worker, so window and door counts remain an optional user correction before scenario analysis.
+
+## Provider boundaries
+
+- `MetricDepthProvider` — metric depth and focal information.
+- `RoomStructureProvider` — floor, ceiling, walls, corners, vanishing points, and confidence.
+- `RoomMeasurementProvider` — job-level contract used by HomeLens. The current remote worker is replaceable by future ARCore, RoomPlan, or other providers.
+
+## Persistence and learning
+
+Fused measurements store uncertainty and all model versions in queryable columns. `measurement_observations` keeps per-view scalar evidence. `image_inference_runs` records processing status and quality without depth maps. Human corrections preserve the original estimate and add photo-specific error context to `verification_evidence`.
+
+## Deployment boundary
+
+The `inference-worker/` image requires a CUDA-capable GPU host and the Depth Pro checkpoint. Deploy with `inference-worker/modal_app.py` or the Dockerfile. Configure the server-only worker URL, bearer token, callback secret, and public HTTPS application URL. The worker downloads only short-lived private objects, processes them in memory, and discards source images and depth arrays after each job.
