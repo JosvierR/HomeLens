@@ -156,14 +156,18 @@ const clearPoll = () => {
   pollTimer = undefined
 }
 
+let sessionPrepareId = 0
+
 const enableCamera = async () => {
   submitError.value = null
   microFeedback.value = ''
+  sessionPrepareId += 1
   // Mount the <video> first, then request the stream from this user gesture.
   mode.value = 'capturing'
   await nextTick()
   await nextTick()
   const started = await startCamera()
+  if (mode.value !== 'capturing') return
   if (!started || cameraState.value !== 'active') {
     mode.value = 'gate'
     return
@@ -182,6 +186,7 @@ const enableCamera = async () => {
 
 const openNativeCamera = () => {
   submitError.value = null
+  sessionPrepareId += 1
   stopCamera()
   mode.value = 'capturing'
   nextTick(() => nativeCaptureInput.value?.click())
@@ -194,9 +199,13 @@ const pollEstimation = async () => {
     const status = await $fetch<PhotoEstimationStatusResponse>(`/api/scans/${context.scanId}/estimation`)
     estimationStatus.value = status
     pollCount.value += 1
-    if (status.state === 'processing_geometry' || status.state === 'captured') {
+    if (status.state === 'processing_geometry' || (status.state === 'captured' && status.progress.total > 0)) {
       if (pollCount.value >= 100) throw new Error('The geometry worker is taking too long. Your private views are saved; retry when the service is available.')
       pollTimer = setTimeout(pollEstimation, 1000)
+      return
+    }
+    if (status.state === 'idle' || (status.state === 'captured' && status.progress.total === 0)) {
+      mode.value = capturedViews.value.length ? 'capturing' : 'gate'
       return
     }
     if (status.state === 'failed') {
@@ -482,6 +491,7 @@ const loadProductRoom = async () => {
 }
 
 const prepareScanSession = async () => {
+  const prepareId = ++sessionPrepareId
   submitError.value = null
   if (!configured) {
     submitError.value = 'This demo environment is not connected yet.'
@@ -499,18 +509,24 @@ const prepareScanSession = async () => {
     await loadProductRoom()
   }
 
+  if (prepareId !== sessionPrepareId) return
+  if (mode.value === 'capturing' || mode.value === 'uploading' || mode.value === 'estimating') return
+
   const context = productContext.value
   if (!context) return
   try {
     const status = await $fetch<PhotoEstimationStatusResponse>(`/api/scans/${context.scanId}/estimation`)
+    if (prepareId !== sessionPrepareId) return
+    if (mode.value === 'capturing' || mode.value === 'uploading') return
     estimationStatus.value = status
-    if (status.state === 'processing_geometry' || status.state === 'captured') {
+    const hasInferenceWork = Boolean(status.jobId) || status.progress.total > 0
+    if (status.state === 'processing_geometry' && hasInferenceWork) {
       mode.value = 'estimating'
       pollCount.value = 0
       await pollEstimation()
       return
     }
-    if (status.state === 'failed') {
+    if (status.state === 'failed' && hasInferenceWork) {
       mode.value = 'failed'
       submitError.value = status.error?.message ?? 'The geometry worker could not complete this scan.'
       return
@@ -525,10 +541,6 @@ const prepareScanSession = async () => {
     }
   } catch {
     // Fresh capture can still start.
-  }
-
-  if (mode.value === 'gate') {
-    // Do not auto-open getUserMedia. Mobile browsers require a real tap.
   }
 }
 

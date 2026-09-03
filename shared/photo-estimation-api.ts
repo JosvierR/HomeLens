@@ -11,12 +11,33 @@ export const acceptPhotoEstimateSchema = z.object({
 }).strict()
 
 export type PhotoEstimationState =
+  | 'idle'
   | 'captured'
   | 'processing_geometry'
   | 'estimated'
   | 'needs_more_evidence'
   | 'ready_for_analysis'
   | 'failed'
+
+const ACTIVE_ESTIMATION_STATES = new Set<string>([
+  'captured',
+  'processing_geometry',
+  'estimated',
+  'needs_more_evidence',
+  'ready_for_analysis',
+  'failed'
+])
+
+/** Map a scan row status to the photo-estimation UI state. Draft scans must stay idle. */
+export const inferPhotoEstimationState = (
+  scanStatus: string,
+  nextCaptureKind?: string | null
+): PhotoEstimationState => {
+  if (scanStatus === 'estimated' && nextCaptureKind === 'stop') return 'ready_for_analysis'
+  if (scanStatus === 'stable' || scanStatus === 'completed') return 'ready_for_analysis'
+  if (ACTIVE_ESTIMATION_STATES.has(scanStatus)) return scanStatus as PhotoEstimationState
+  return 'idle'
+}
 
 export interface PhotoEstimationStatusResponse {
   state: PhotoEstimationState

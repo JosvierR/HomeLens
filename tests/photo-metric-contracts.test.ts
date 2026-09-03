@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { inferPhotoEstimationState } from '../shared/photo-estimation-api'
 import { metricDepthResultSchema, photoMetricCallbackSchema } from '../shared/photo-metric'
 
 describe('photo metric contracts', () => {
@@ -53,6 +54,24 @@ describe('photo metric contracts', () => {
       status: 'failed',
       completedAt: '2026-09-03T12:00:00.000Z'
     })).toThrow()
+  })
+})
+
+describe('photo estimation status mapping', () => {
+  it('keeps a draft scan idle so capture is not skipped', () => {
+    expect(inferPhotoEstimationState('draft')).toBe('idle')
+    expect(inferPhotoEstimationState('capturing')).toBe('idle')
+    expect(inferPhotoEstimationState('analyzing')).toBe('idle')
+  })
+
+  it('only reports captured after photos exist, not as a default', () => {
+    expect(inferPhotoEstimationState('captured')).toBe('captured')
+    expect(inferPhotoEstimationState('processing_geometry')).toBe('processing_geometry')
+  })
+
+  it('maps finished scans to analysis-ready when capture can stop', () => {
+    expect(inferPhotoEstimationState('estimated', 'stop')).toBe('ready_for_analysis')
+    expect(inferPhotoEstimationState('completed')).toBe('ready_for_analysis')
   })
 })
 

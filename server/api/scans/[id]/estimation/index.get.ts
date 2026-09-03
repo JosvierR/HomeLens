@@ -3,7 +3,7 @@ import { calculateHomeLensAnalysis } from '~~/shared/analysis'
 import { recommendNextBestCapture } from '~~/shared/next-best-capture'
 import { buildPhotoRoomEstimate } from '~~/shared/photo-measurement'
 import type { MeasurementObservation } from '~~/shared/photo-metric'
-import type { PhotoEstimationStatusResponse } from '~~/shared/photo-estimation-api'
+import { inferPhotoEstimationState, type PhotoEstimationStatusResponse } from '~~/shared/photo-estimation-api'
 import { SupabaseEvidenceRepository } from '../../../../services/supabase-evidence-repository'
 import { ApiContractError, apiFailure } from '../../../../utils/api-contract'
 import { getRequestId, logServerEvent } from '../../../../utils/observability'
@@ -130,13 +130,7 @@ export default defineEventHandler(async event => {
 
     const runs = runResult.data ?? []
     const completed = runs.filter(run => ['succeeded', 'partial', 'insufficient', 'failed'].includes(run.status)).length
-    const inferredState: PhotoEstimationStatusResponse['state'] = scanRow.status === 'estimated' && nextCapture?.kind === 'stop'
-      ? 'ready_for_analysis'
-      : ['captured', 'processing_geometry', 'estimated', 'needs_more_evidence', 'ready_for_analysis', 'failed'].includes(scanRow.status)
-        ? scanRow.status
-        : scanRow.status === 'stable' || scanRow.status === 'completed'
-          ? 'ready_for_analysis'
-          : 'captured'
+    const inferredState = inferPhotoEstimationState(scanRow.status, nextCapture?.kind)
     const response: PhotoEstimationStatusResponse = {
       state: inferredState,
       jobId: scanRow.inference_job_id ?? null,
