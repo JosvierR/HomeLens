@@ -35,7 +35,7 @@ interface DrawableImage {
 }
 
 const MAX_EDGE = 1280
-const CAMERA_START_TIMEOUT = 4500
+const CAMERA_START_TIMEOUT = 8000
 const JPEG_QUALITY = 0.78
 
 const errorName = (error: unknown) => error instanceof DOMException
@@ -52,21 +52,25 @@ const mapPermissionError = (error: unknown): { state: CameraLifecycleState, mess
   if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
     return { state: 'unavailable', message: 'No camera was found on this device.' }
   }
-  if (name === 'NotReadableError' || name === 'TrackStartError' || name === 'AbortError') {
-    return { state: 'error', message: 'The camera is being used by another app or could not start. Close other camera apps and try again.' }
+  if (name === 'NotReadableError' || name === 'TrackStartError') {
+    return { state: 'error', message: 'The camera is being used by another app. Close other camera apps and try again.' }
   }
   if (name === 'OverconstrainedError' || name === 'ConstraintNotSatisfiedError') {
     return { state: 'error', message: 'This camera does not support the requested mode.' }
+  }
+  if (name === 'AbortError') {
+    return { state: 'error', message: 'Camera start was interrupted. Tap Open camera again.' }
   }
   return { state: 'unavailable', message: 'Camera access is unavailable right now.' }
 }
 
 const waitForVideo = async (video: HTMLVideoElement) => {
-  if (video.readyState >= HTMLMediaElement.HAVE_METADATA && video.videoWidth > 0) return
+  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0) return
   await new Promise<void>((resolve, reject) => {
     const timeout = window.setTimeout(() => {
       cleanup()
-      reject(new Error('Camera preview timed out.'))
+      if (video.videoWidth > 0) resolve()
+      else reject(new Error('Camera preview timed out.'))
     }, CAMERA_START_TIMEOUT)
     const onReady = () => {
       if (!video.videoWidth) return
@@ -80,11 +84,15 @@ const waitForVideo = async (video: HTMLVideoElement) => {
     const cleanup = () => {
       window.clearTimeout(timeout)
       video.removeEventListener('loadedmetadata', onReady)
+      video.removeEventListener('loadeddata', onReady)
       video.removeEventListener('canplay', onReady)
+      video.removeEventListener('playing', onReady)
       video.removeEventListener('error', onError)
     }
     video.addEventListener('loadedmetadata', onReady)
+    video.addEventListener('loadeddata', onReady)
     video.addEventListener('canplay', onReady)
+    video.addEventListener('playing', onReady)
     video.addEventListener('error', onError)
   })
 }
@@ -174,7 +182,10 @@ export const useCamera = () => {
     stream.value?.getTracks().forEach(track => track.stop())
     stream.value = null
     previewReady.value = false
-    if (videoEl.value) videoEl.value.srcObject = null
+    if (videoEl.value) {
+      videoEl.value.srcObject = null
+      try { videoEl.value.pause() } catch { /* ignore */ }
+    }
   }
 
   const enumerate = async () => {
@@ -188,18 +199,29 @@ export const useCamera = () => {
   }
 
   const bindVideo = async (element: HTMLVideoElement | null) => {
-    videoEl.value = element
+    if (element) videoEl.value = element
+    const target = videoEl.value
     const media = stream.value
-    if (!element || !media) return false
+    if (!target || !media) return false
     previewReady.value = false
-    element.muted = true
-    element.playsInline = true
-    if (element.srcObject !== media) element.srcObject = media
+    target.setAttribute('playsinline', 'true')
+    target.setAttribute('webkit-playsinline', 'true')
+    target.muted = true
+    target.defaultMuted = true
+    target.autoplay = true
+    target.playsInline = true
+    if (target.srcObject !== media) target.srcObject = media
     try {
-      await element.play()
-      await waitForVideo(element)
-      previewReady.value = element.videoWidth > 0 && element.videoHeight > 0
-      return previewReady.value
+      const playResult = target.play()
+      if (playResult && typeof playResult.then === 'function') await playResult
+      await waitForVideo(target)
+      previewReady.value = target.videoWidth > 0 && target.videoHeight > 0
+      if (!previewReady.value) {
+        errorMessage.value = 'Live preview did not start. Try again or use the phone camera.'
+        return false
+      }
+      errorMessage.value = null
+      return true
     } catch (error) {
       errorMessage.value = error instanceof Error ? error.message : 'Camera preview could not start.'
       return false
@@ -211,49 +233,44 @@ export const useCamera = () => {
   )
 
   const startCamera = async (deviceId?: string, allowRearUpgrade = true) => {
-    if (!import.meta.client) return
+    if (!import.meta.client) return false
     const requestId = ++requestSequence
     errorMessage.value = null
     previewReady.value = false
     if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
       state.value = 'unavailable'
       errorMessage.value = 'Camera access needs a secure HTTPS connection.'
-      return
+      return false
     }
     if (!navigator.mediaDevices?.getUserMedia) {
       state.value = 'unavailable'
       errorMessage.value = 'This browser cannot provide a live camera preview.'
-      return
+      return false
     }
 
     state.value = 'requesting_permission'
     stopTracks()
+
+    // Prefer a simple stream first so Safari/iOS accepts the user gesture promptly.
     const candidates: MediaStreamConstraints[] = deviceId
       ? [
-          { audio: false, video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } },
+          { audio: false, video: { deviceId: { exact: deviceId } } },
           { audio: false, video: { facingMode: { ideal: 'environment' } } },
           { audio: false, video: true }
         ]
       : [
-          {
-            audio: false,
-            video: {
-              facingMode: { ideal: 'environment' },
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            }
-          },
           { audio: false, video: { facingMode: { ideal: 'environment' } } },
-          { audio: false, video: true }
+          { audio: false, video: true },
+          { audio: false, video: { facingMode: 'user' } }
         ]
 
     let lastError: unknown
-    for (let index = 0; index < candidates.length; index += 1) {
+    for (const constraints of candidates) {
       try {
-        const media = await navigator.mediaDevices.getUserMedia(candidates[index]!)
+        const media = await navigator.mediaDevices.getUserMedia(constraints)
         if (requestId !== requestSequence) {
           media.getTracks().forEach(track => track.stop())
-          return
+          return false
         }
         const track = media.getVideoTracks()[0]
         if (!track) throw new DOMException('No video track was returned.', 'NotFoundError')
@@ -261,44 +278,51 @@ export const useCamera = () => {
           if (stream.value !== media) return
           stopTracks()
           state.value = 'error'
-          errorMessage.value = 'The camera stopped. Tap Try again to reopen it.'
+          errorMessage.value = 'The camera stopped. Tap Open camera again.'
         }, { once: true })
         stream.value = media
         const settings = track.getSettings()
         currentDeviceId.value = settings.deviceId ?? deviceId ?? null
-        facingMode.value = settings.facingMode ?? null
+        facingMode.value = typeof settings.facingMode === 'string' ? settings.facingMode : null
         state.value = 'active'
         await enumerate()
 
         const rearDevice = !deviceId && allowRearUpgrade ? findRearDevice() : undefined
         if (rearDevice?.deviceId && rearDevice.deviceId !== currentDeviceId.value && facingMode.value !== 'environment') {
-          await startCamera(rearDevice.deviceId, false)
-        } else if (videoEl.value) {
-          await bindVideo(videoEl.value)
+          return await startCamera(rearDevice.deviceId, false)
         }
-        return
+
+        if (videoEl.value) {
+          const bound = await bindVideo(videoEl.value)
+          if (!bound && requestId === requestSequence) {
+            // Keep the stream; the page can retry bind after the video mounts.
+            return true
+          }
+        }
+        return true
       } catch (error) {
         lastError = error
         const name = errorName(error)
         if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError') break
-        if (deviceId && index === 0) continue
-        if (name !== 'OverconstrainedError' && name !== 'ConstraintNotSatisfiedError') break
+        // Keep trying softer constraints for Overconstrained / Abort / NotReadable races.
       }
     }
 
-    if (requestId !== requestSequence) return
+    if (requestId !== requestSequence) return false
     stopTracks()
     const mapped = mapPermissionError(lastError)
     state.value = mapped.state
     errorMessage.value = mapped.message
+    return false
   }
 
   const switchCamera = async () => {
-    if (devices.value.length < 2) return
+    if (devices.value.length < 2) return false
     const ids = devices.value.map(item => item.deviceId).filter(Boolean)
     const currentIndex = ids.indexOf(currentDeviceId.value ?? '')
     const next = ids[currentIndex < 0 ? 0 : (currentIndex + 1) % ids.length]
-    if (next) await startCamera(next, false)
+    if (!next) return false
+    return startCamera(next, false)
   }
 
   const normalizeDrawable = async (
@@ -343,30 +367,17 @@ export const useCamera = () => {
     try {
       await waitForVideo(video)
       const track = media.getVideoTracks()[0]
-      const ImageCaptureConstructor = (window as unknown as {
-        ImageCapture?: new (mediaTrack: MediaStreamTrack) => { takePhoto: () => Promise<Blob> }
-      }).ImageCapture
-      if (ImageCaptureConstructor && track) {
-        try {
-          const photo = await new ImageCaptureConstructor(track).takePhoto()
-          drawable = await loadDrawableImage(photo)
-        } catch {
-          drawable = null
-        }
-      }
-
-      if (!drawable) {
-        drawable = {
-          source: video,
-          width: video.videoWidth,
-          height: video.videoHeight,
-          release: () => undefined
-        }
+      // Prefer the live video frame on mobile; ImageCapture is flaky on Safari.
+      drawable = {
+        source: video,
+        width: video.videoWidth || 1,
+        height: video.videoHeight || 1,
+        release: () => undefined
       }
       const settings = track?.getSettings()
       const result = await normalizeDrawable(drawable, targetType, {
         cameraId: settings?.deviceId,
-        facingMode: settings?.facingMode
+        facingMode: typeof settings?.facingMode === 'string' ? settings.facingMode : undefined
       })
       state.value = 'active'
       errorMessage.value = null

@@ -159,12 +159,24 @@ const clearPoll = () => {
 const enableCamera = async () => {
   submitError.value = null
   microFeedback.value = ''
-  await startCamera()
-  if (cameraState.value !== 'active') return
+  // Mount the <video> first, then request the stream from this user gesture.
   mode.value = 'capturing'
   await nextTick()
-  const bound = await bindVideo(videoEl.value)
-  if (!bound) microFeedback.value = cameraError.value ?? 'The preview could not start. Try the phone camera option.'
+  await nextTick()
+  const started = await startCamera()
+  if (!started || cameraState.value !== 'active') {
+    mode.value = 'gate'
+    return
+  }
+  await nextTick()
+  let bound = await bindVideo(videoEl.value)
+  if (!bound) {
+    await new Promise(resolve => window.setTimeout(resolve, 120))
+    bound = await bindVideo(videoEl.value)
+  }
+  if (!bound) {
+    microFeedback.value = cameraError.value ?? 'The preview could not start. Try again or use the phone camera.'
+  }
   track('scan_started', { captureMethod: 'camera' })
 }
 
@@ -515,13 +527,15 @@ const prepareScanSession = async () => {
     // Fresh capture can still start.
   }
 
-  if (mode.value === 'gate') await enableCamera()
+  if (mode.value === 'gate') {
+    // Do not auto-open getUserMedia. Mobile browsers require a real tap.
+  }
 }
 
 watch(stream, async current => {
   if (!current || mode.value !== 'capturing') return
   await nextTick()
-  await bindVideo(videoEl.value)
+  if (!previewReady.value) await bindVideo(videoEl.value)
 }, { flush: 'post' })
 
 onMounted(() => {
@@ -567,7 +581,15 @@ onBeforeUnmount(() => {
             <button v-if="stream && devices.length > 1" type="button" class="camera-switch" :disabled="captureBusy" @click="changeCamera">Switch front/rear</button>
           </div>
           <h2 id="capture-surface-title" class="sr-only">Live room camera</h2>
-          <video v-show="stream" ref="videoEl" class="camera-video" playsinline muted autoplay />
+          <video
+            v-show="stream"
+            ref="videoEl"
+            class="camera-video"
+            playsinline
+            webkit-playsinline
+            muted
+            autoplay
+          />
           <img v-if="!stream && lastCapturedView" class="camera-video camera-still" :src="lastCapturedView.previewUrl" alt="Most recently accepted room view">
           <div v-else-if="!stream" class="camera-placeholder">{{ captureBusy ? 'Checking photo...' : 'Open the phone camera for this view.' }}</div>
           <div class="frame-guide" aria-hidden="true" />
