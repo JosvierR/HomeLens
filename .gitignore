@@ -11,3 +11,4 @@ supabase/.branches/
 inference-worker/__pycache__/
 inference-worker/.pytest_cache/
 *.pyc
+.env.inference

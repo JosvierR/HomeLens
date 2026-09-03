@@ -26,7 +26,7 @@ image = (
     )
     .pip_install_from_requirements(str(WORKER_DIR / "requirements.txt"))
     .env({"DEPTH_PRO_CHECKPOINT": "/opt/depth-pro/checkpoints/depth_pro.pt"})
-    .add_local_file(str(WORKER_DIR / "app.py"), "/opt/homelens/app.py")
+    .add_local_file(str(WORKER_DIR / "app.py"), "/opt/homelens/app.py", copy=True)
     .workdir("/opt/depth-pro")
 )
 
@@ -38,6 +38,7 @@ secrets = modal.Secret.from_name("homelens-inference")
     image=image,
     gpu="A10G",
     timeout=900,
+    startup_timeout=600,
     scaledown_window=300,
     secrets=[secrets],
 )

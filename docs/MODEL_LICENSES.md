@@ -8,7 +8,7 @@
 - License file: <https://github.com/apple/ml-depth-pro/blob/main/LICENSE>
 - Acknowledgements: <https://github.com/apple/ml-depth-pro/blob/main/ACKNOWLEDGEMENTS.md>
 
-Depth Pro uses an Apple model/source license, not a blanket MIT or Apache license. The license grants specified copyright permissions subject to its conditions and explicitly does not grant patent rights. The acknowledgements list separately licensed components. Legal review of the exact source, checkpoint, dependencies, notices, distribution model, and intended commercial use is required before commercialization. This document is an engineering inventory, not legal advice.
+Depth Pro uses Apple's repository license (Copyright (C) 2024 Apple Inc.), not MIT or Apache. Apple grants a personal, non-exclusive copyright license to use, reproduce, modify, and redistribute the software, with or without modifications, provided unmodified full redistributions retain the notice and disclaimers. The license does not grant patent rights, trademark rights, or a commercial warranty. The software is provided AS IS. `ACKNOWLEDGEMENTS.md` lists separately licensed subcomponents, including PyTorch Image Models (`timm`, Apache 2.0). This document is an engineering inventory, not legal advice. Legal review is required before commercialization.
 
 ## HomeLens structure and geometry
 
