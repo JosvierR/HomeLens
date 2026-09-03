@@ -39,8 +39,8 @@ const steps = [
           shows a likely range, and asks you to check only the uncertainty that can change the result.
         </p>
         <div class="hero-actions">
-          <NuxtLink to="/projects" class="button">Scan a room</NuxtLink>
-          <NuxtLink to="/analysis?demo=1" class="button button--secondary">Try the demo</NuxtLink>
+          <NuxtLink to="/scan" class="button">Scan a room</NuxtLink>
+          <NuxtLink to="/analysis?demo=1" class="button button--secondary">See sample analysis</NuxtLink>
         </div>
       </section>
 

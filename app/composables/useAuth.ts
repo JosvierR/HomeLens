@@ -32,6 +32,28 @@ export const useAuth = () => {
     }
   }
 
+  /** Silent demo session so the camera flow works without a login screen. */
+  const ensureGuestSession = async () => {
+    if (!configured) return null
+    const existing = await refresh()
+    if (existing?.user) return existing
+    loading.value = true
+    authError.value = null
+    try {
+      const supabase = getClient()
+      const { data, error } = await supabase.auth.signInAnonymously()
+      if (error) throw error
+      session.value = data.session
+      user.value = data.session?.user ?? data.user ?? null
+      return data.session
+    } catch (error) {
+      authError.value = error instanceof Error ? error.message : 'Could not start the demo session.'
+      return null
+    } finally {
+      loading.value = false
+    }
+  }
+
   const signInWithPassword = async (email: string, password: string) => {
     if (!configured) throw new Error('Supabase is not configured.')
     loading.value = true
@@ -59,7 +81,6 @@ export const useAuth = () => {
       const supabase = getClient()
       const { data, error } = await supabase.auth.signUp({ email, password })
       if (error) throw error
-      // Free-tier projects may require email confirmation. If a session is returned, continue.
       session.value = data.session
       user.value = data.session?.user ?? data.user ?? null
       if (data.session) return { ok: true as const, needsConfirmation: false }
@@ -95,6 +116,7 @@ export const useAuth = () => {
     loading,
     authError,
     refresh,
+    ensureGuestSession,
     signInWithPassword,
     signUpWithPassword,
     signOut

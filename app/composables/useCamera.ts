@@ -34,8 +34,9 @@ interface DrawableImage {
   release: () => void
 }
 
-const MAX_EDGE = 1920
-const CAMERA_START_TIMEOUT = 6000
+const MAX_EDGE = 1280
+const CAMERA_START_TIMEOUT = 4500
+const JPEG_QUALITY = 0.78
 
 const errorName = (error: unknown) => error instanceof DOMException
   ? error.name
@@ -89,7 +90,7 @@ const waitForVideo = async (video: HTMLVideoElement) => {
 }
 
 const sampleQuality = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-  const step = Math.max(4, Math.floor(Math.min(width, height) / 80))
+  const step = Math.max(6, Math.floor(Math.min(width, height) / 60))
   let sum = 0
   let sumSquares = 0
   let count = 0
@@ -229,7 +230,7 @@ export const useCamera = () => {
     stopTracks()
     const candidates: MediaStreamConstraints[] = deviceId
       ? [
-          { audio: false, video: { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } } },
+          { audio: false, video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } },
           { audio: false, video: { facingMode: { ideal: 'environment' } } },
           { audio: false, video: true }
         ]
@@ -238,8 +239,8 @@ export const useCamera = () => {
             audio: false,
             video: {
               facingMode: { ideal: 'environment' },
-              width: { ideal: 1920 },
-              height: { ideal: 1080 }
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
             }
           },
           { audio: false, video: { facingMode: { ideal: 'environment' } } },
@@ -315,7 +316,7 @@ export const useCamera = () => {
     if (!ctx) throw new Error('Could not prepare the captured frame.')
     ctx.drawImage(drawable.source, 0, 0, width, height)
     const quality = sampleQuality(ctx, width, height)
-    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.86))
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY))
     if (!blob) throw new Error('Could not encode the captured frame.')
     return {
       captureId: crypto.randomUUID(),

@@ -37,7 +37,7 @@ const router = useRouter()
 const route = useRoute()
 const { scan, replaceScan } = useDemoScan()
 const { track } = useProductAnalytics()
-const { user, refresh: refreshAuth } = useAuth()
+const { user, refresh: refreshAuth, ensureGuestSession, configured } = useAuth()
 const { uploadCapture } = useCaptureEvidence()
 const {
   state: cameraState,
@@ -184,7 +184,7 @@ const pollEstimation = async () => {
     pollCount.value += 1
     if (status.state === 'processing_geometry' || status.state === 'captured') {
       if (pollCount.value >= 100) throw new Error('The geometry worker is taking too long. Your private views are saved; retry when the service is available.')
-      pollTimer = setTimeout(pollEstimation, 1500)
+      pollTimer = setTimeout(pollEstimation, 1000)
       return
     }
     if (status.state === 'failed') {
@@ -202,24 +202,28 @@ const pollEstimation = async () => {
 const beginPhotoEstimation = async () => {
   clearPoll()
   submitError.value = null
-  const context = productContext.value
+  let context = productContext.value
+  if (!context) {
+    const started = await bootstrapGuestScan()
+    context = started
+  }
   if (!context) {
     mode.value = 'failed'
-    submitError.value = 'Automatic metric estimation requires a signed-in private project. Create a project, then start its room scan.'
+    submitError.value = 'Could not start this scan session. Refresh and try again.'
     return
   }
   mode.value = 'uploading'
   try {
-    await refreshAuth()
-    if (!user.value) throw new Error('Your session expired. Sign in again before processing these views.')
-    for (const view of capturedViews.value) {
-      if (view.evidenceId) continue
+    await ensureGuestSession()
+    if (!user.value) throw new Error('Could not start a demo session for this scan.')
+    const pending = capturedViews.value.filter(view => !view.evidenceId)
+    await Promise.all(pending.map(async view => {
       view.evidenceId = await uploadCapture(view.frame, view.quality, {
-        scanId: context.scanId,
-        projectId: context.projectId,
+        scanId: context!.scanId,
+        projectId: context!.projectId,
         deviceFamily: deviceFamily.value
       })
-    }
+    }))
     await $fetch(`/api/scans/${context.scanId}/estimation/start`, { method: 'POST' })
     estimationAttempts.value += 1
     pollCount.value = 0
@@ -228,6 +232,29 @@ const beginPhotoEstimation = async () => {
   } catch (error) {
     mode.value = 'failed'
     submitError.value = errorText(error, 'Photo estimation is unavailable. Your accepted views are still here.')
+  }
+}
+
+const bootstrapGuestScan = async () => {
+  if (!configured) return null
+  const guest = await ensureGuestSession()
+  if (!guest) return null
+  const started = await $fetch<{ projectId: string, roomId: string, scanId: string, roomName: string }>('/api/demo/start-scan', {
+    method: 'POST'
+  })
+  roomName.value = started.roomName || roomName.value
+  await router.replace({
+    path: '/scan',
+    query: {
+      projectId: started.projectId,
+      roomId: started.roomId,
+      scanId: started.scanId
+    }
+  })
+  return {
+    projectId: started.projectId,
+    roomId: started.roomId,
+    scanId: started.scanId
   }
 }
 
@@ -442,14 +469,24 @@ const loadProductRoom = async () => {
   }
 }
 
-watch(stream, async current => {
-  if (!current || mode.value !== 'capturing') return
-  await nextTick()
-  await bindVideo(videoEl.value)
-}, { flush: 'post' })
+const prepareScanSession = async () => {
+  submitError.value = null
+  if (!configured) {
+    submitError.value = 'This demo environment is not connected yet.'
+    return
+  }
+  if (!productContext.value) {
+    try {
+      await bootstrapGuestScan()
+    } catch (error) {
+      submitError.value = errorText(error, 'Could not start the scan. Refresh and try again.')
+      return
+    }
+  } else {
+    await ensureGuestSession()
+    await loadProductRoom()
+  }
 
-onMounted(async () => {
-  await loadProductRoom()
   const context = productContext.value
   if (!context) return
   try {
@@ -459,17 +496,36 @@ onMounted(async () => {
       mode.value = 'estimating'
       pollCount.value = 0
       await pollEstimation()
-    } else if (status.state === 'failed') {
+      return
+    }
+    if (status.state === 'failed') {
       mode.value = 'failed'
       submitError.value = status.error?.message ?? 'The geometry worker could not complete this scan.'
-    } else if (status.state === 'needs_more_evidence') {
+      return
+    }
+    if (status.state === 'needs_more_evidence') {
       mode.value = 'needs_more_evidence'
-    } else if (status.scan && (status.state === 'estimated' || status.state === 'ready_for_analysis')) {
+      return
+    }
+    if (status.scan && (status.state === 'estimated' || status.state === 'ready_for_analysis')) {
       mode.value = 'results'
+      return
     }
   } catch {
-    // A fresh capture can still start if status restore fails.
+    // Fresh capture can still start.
   }
+
+  if (mode.value === 'gate') await enableCamera()
+}
+
+watch(stream, async current => {
+  if (!current || mode.value !== 'capturing') return
+  await nextTick()
+  await bindVideo(videoEl.value)
+}, { flush: 'post' })
+
+onMounted(() => {
+  void prepareScanSession()
 })
 onBeforeUnmount(() => {
   clearPoll()
@@ -483,7 +539,7 @@ onBeforeUnmount(() => {
   <main class="scan-page">
     <header class="scan-header">
       <div class="scan-shell scan-header-inner">
-        <NuxtLink :to="productContext ? `/projects/${productContext.projectId}` : '/projects'" class="back-link" aria-label="Back">&#8592; Back</NuxtLink>
+        <NuxtLink to="/" class="back-link" aria-label="Back">&#8592; Back</NuxtLink>
         <div class="room-status"><h1>{{ roomName }}</h1><p>{{ statusLine }}</p></div>
         <div class="progress-readout numeric" aria-live="polite">{{ acceptedBaseCount }}/3</div>
       </div>
@@ -491,20 +547,17 @@ onBeforeUnmount(() => {
 
     <div class="scan-shell scan-content">
       <section v-if="mode === 'gate'" class="permission-gate" aria-labelledby="camera-gate-title">
-        <p class="eyebrow">Real camera capture</p>
-        <h2 id="camera-gate-title">See exactly what your phone camera sees.</h2>
-        <p>The live preview prioritizes the rear camera, supports switching cameras, and falls back to the phone's native camera when needed. HomeLens never records audio.</p>
-        <div v-if="!productContext" class="setup-notice">
-          Automatic metric processing needs a private project scan so images can be sent securely to the GPU worker.
-          <NuxtLink to="/projects">Choose or create a project</NuxtLink>.
-        </div>
+        <p class="eyebrow">Quick room scan</p>
+        <h2 id="camera-gate-title">Open the camera and capture three views.</h2>
+        <p>No account needed. HomeLens uses the same photo-to-metric model to estimate width, length, and ceiling height.</p>
         <div v-if="cameraState === 'requesting_permission'" class="gate-status" role="status">Opening the camera...</div>
-        <div v-else-if="showCameraError" class="gate-error" role="alert"><strong>{{ cameraError || 'Camera access is blocked.' }}</strong><br>Retry the live preview or use the native camera.</div>
+        <div v-else-if="showCameraError" class="gate-error" role="alert"><strong>{{ cameraError || 'Camera access is blocked.' }}</strong><br>Retry the live preview or use the phone camera.</div>
+        <p v-if="submitError" class="submit-error" role="alert">{{ submitError }}</p>
         <div class="gate-actions">
-          <button type="button" class="button" :disabled="cameraState === 'requesting_permission'" @click="enableCamera">{{ showCameraError ? 'Try live camera again' : 'Open live camera' }}</button>
+          <button type="button" class="button" :disabled="cameraState === 'requesting_permission'" @click="enableCamera">{{ showCameraError ? 'Try camera again' : 'Open camera' }}</button>
           <button type="button" class="button button--secondary" @click="openNativeCamera">Use phone camera</button>
         </div>
-        <p class="privacy-note">Accepted project images are stored privately and exposed to inference only through short-lived signed URLs.</p>
+        <p class="privacy-note">Images stay private for this scan and are sent to the GPU worker only through short-lived access.</p>
       </section>
 
       <section v-else-if="mode === 'capturing'" class="capture-workspace" aria-labelledby="capture-surface-title">
@@ -589,7 +642,7 @@ onBeforeUnmount(() => {
           <button v-if="mode === 'needs_more_evidence'" type="button" class="button" @click="takeRecommendedView">Take recommended view</button>
           <button v-else type="button" class="button" @click="beginPhotoEstimation">Retry automatic estimate</button>
           <button v-if="manualAllowed" type="button" class="button button--secondary" @click="openManualFallback">Use physical measurements instead</button>
-          <NuxtLink v-if="!productContext" to="/projects" class="button button--secondary">Open projects</NuxtLink>
+          <NuxtLink to="/" class="button button--secondary">Back home</NuxtLink>
           <button type="button" class="text-button" @click="retakeAll">Retake all views</button>
         </div>
         <p v-if="!manualAllowed" class="privacy-note">Manual dimensions become available only after the recommended evidence attempt.</p>

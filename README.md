@@ -28,7 +28,7 @@ Photo estimation
 | Mode | Auth | Persistence | Learning |
 |---|---|---|---|
 | Try demo | No | Local / synthetic | Isolated (`synthetic_demo`) |
-| Real product | Email + password | Supabase Postgres + private Storage | `real_user_verification` only |
+| Real product | Optional (anonymous guest for demo scan) | Supabase Postgres + private Storage | `real_user_verification` only |
 
 ## Stack
 
