@@ -1,0 +1,19 @@
+name: Feature
+about: Product or engineering feature
+body:
+  - type: textarea
+    attributes:
+      label: Problem
+      description: What user or system problem are we solving?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Acceptance criteria
+    validations:
+      required: true
