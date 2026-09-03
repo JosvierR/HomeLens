@@ -260,14 +260,14 @@ try {
   await evaluate(`document.querySelector('.dimension--width')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))`)
   await pause(100)
   const geometrySelection = await evaluate(`(() => ({
-      widthCardSelected: document.querySelector('#measurement-width')?.classList.contains('measurement-card--selected') ?? false,
-      heightCardSelected: document.querySelector('#measurement-height')?.classList.contains('measurement-card--selected') ?? false
+      widthRowSelected: document.querySelector('#measurement-width')?.classList.contains('measurement-row--selected') ?? false,
+      heightRowSelected: document.querySelector('#measurement-height')?.classList.contains('measurement-row--selected') ?? false
     }))()`)
   const beforeVerification = await evaluate(`({
     stability: document.querySelector('.score-value')?.textContent?.trim() ?? null,
     rescueAction: document.querySelector('.verify-button')?.textContent?.trim() ?? null,
     source: document.querySelector('#measurement-height .source')?.textContent?.trim() ?? null,
-    calibration: document.querySelector('.calibration-card')?.textContent?.replace(/\\s+/g, ' ').trim() ?? null,
+    calibration: document.querySelector('.calibration-panel')?.textContent?.replace(/\\s+/g, ' ').trim() ?? null,
     queue: document.querySelector('.queue-list')?.textContent?.replace(/\\s+/g, ' ').trim() ?? null
   })`)
   await evaluate(`document.querySelector('.verify-button')?.click()`)
@@ -291,14 +291,14 @@ try {
     evidenceFeedback: document.querySelector('.learning-feedback')?.textContent?.replace(/\\s+/g, ' ').trim() ?? null,
     rescueStatus: document.querySelector('.stable-state')?.textContent?.trim() ?? null,
     queueContainsHeight: document.querySelector('.queue-list')?.textContent?.includes('Ceiling height') ?? false,
-    calibration: document.querySelector('.calibration-card')?.textContent?.replace(/\\s+/g, ' ').trim() ?? null
+    calibration: document.querySelector('.calibration-panel')?.textContent?.replace(/\\s+/g, ' ').trim() ?? null
   })`)
 
   await evaluate(`document.querySelector('a[href="/"]')?.click()`)
   await pause(600)
   await evaluate(`document.querySelector('a[href="/analysis"]')?.click()`)
   await pause(1_400)
-  const navigationPersistence = await evaluate(`document.querySelector('#measurement-height .source')?.textContent?.includes('Human verified') ?? false`)
+  const navigationPersistence = await evaluate(`document.querySelector('#measurement-height .source')?.textContent?.trim() === 'Verified'`)
 
   await evaluate(`[...document.querySelectorAll('.room-actions button')].find(button => button.textContent?.includes('Reset'))?.click()`)
   await pause(900)
@@ -341,7 +341,7 @@ try {
       return !(text || element.getAttribute('aria-label') || element.getAttribute('title'))
     }).length
     const unlabeledInputs = [...document.querySelectorAll('input')].filter(input => !input.labels?.length && !input.getAttribute('aria-label')).length
-    const confidenceUsesText = [...document.querySelectorAll('.confidence')].every(element => /High|Moderate|Review/.test(element.textContent || ''))
+    const confidenceUsesText = [...document.querySelectorAll('.confidence')].every(element => /\\d+%/.test(element.textContent || ''))
     return {
       focusedTag: active?.tagName?.toLowerCase() ?? null,
       focusedName: (active?.innerText || active?.getAttribute('aria-label') || '').replace(/\\s+/g, ' ').trim().slice(0, 80),
@@ -399,9 +399,9 @@ try {
     ['analysis refresh', directAndRefresh.path === '/analysis' && Boolean(directAndRefresh.hasDecision)],
     ['scan completion guard', scanButtonFound && doubleCompletionGuard],
     ['scan reaches analysis', Boolean(scanTransition.hasAnalysisHeading)],
-    ['geometry selection', geometrySelection.widthCardSelected && !geometrySelection.heightCardSelected],
+    ['geometry selection', geometrySelection.widthRowSelected && !geometrySelection.heightRowSelected],
     ['inline verification', inlineEditorOpened],
-    ['verified provenance', Boolean(afterVerification.source?.includes('Human verified') && afterVerification.provenance?.includes('9.1'))],
+    ['verified provenance', Boolean(afterVerification.source?.includes('Verified') && afterVerification.provenance?.includes('9.1'))],
     ['verified item leaves queue', afterVerification.queueContainsHeight === false],
     ['reset restores demo', resetState.source === 'Estimated' && Boolean(resetState.value?.includes('9.1'))],
     ['invalid edit rejected', invalidEdit.errorVisible && invalidEdit.submitDisabled],

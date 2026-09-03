@@ -53,29 +53,19 @@ onBeforeUnmount(() => timers.forEach(timer => clearTimeout(timer)))
           Back
         </NuxtLink>
         <div class="room-status">
-          <strong>{{ scan.roomName }}</strong>
-          <span><i aria-hidden="true" /> {{ phase === 'complete' ? 'Scan complete' : phase === 'processing' ? 'Processing geometry' : 'Scanning' }}</span>
+          <h1>{{ scan.roomName }}</h1>
+          <p class="numeric">Step {{ currentStep }} of 3 · {{ phase === 'complete' ? 'Scan complete' : phase === 'processing' ? 'Resolving geometry' : 'Capturing perimeter' }}</p>
         </div>
-        <div class="progress-readout"><span>{{ progress }}%</span><i><b :style="{ width: `${progress}%` }" /></i></div>
+        <div class="progress-readout"><span class="numeric">{{ progress }}%</span><i><b :style="{ width: `${progress}%` }" /></i></div>
       </div>
     </header>
 
     <div class="scan-shell scan-content">
-      <ScanProgress :current="currentStep" />
-
-      <div class="capture-heading">
-        <div>
-          <p class="eyebrow">Room capture</p>
-          <h1>{{ phase === 'capturing' ? 'Capture the room perimeter.' : 'Resolving room geometry.' }}</h1>
-        </div>
-        <p>Keep the floor-wall edge visible while moving steadily. HomeLens will flag uncertain dimensions for review.</p>
-      </div>
-
       <section class="capture-workspace" aria-labelledby="capture-surface-title">
         <div class="capture-canvas">
           <div class="canvas-topbar">
             <span class="live-label"><i aria-hidden="true" /> Live capture</span>
-            <span>4 corners · 7 edges</span>
+            <span class="numeric">4 corners · 7 edges</span>
           </div>
 
           <h2 id="capture-surface-title" class="sr-only">Simulated camera and room geometry capture</h2>
@@ -104,10 +94,8 @@ onBeforeUnmount(() => timers.forEach(timer => clearTimeout(timer)))
 
         <aside class="capture-guidance">
           <div class="guidance-main">
-            <p class="eyebrow">Live guidance</p>
-            <span class="guidance-index">01</span>
-            <h2>Move slowly toward the opposite wall.</h2>
-            <p>Keep the lower edge of the wall inside the guide. Corners will lock when their geometry is stable.</p>
+            <h2>Move slowly toward the opposite wall</h2>
+            <p>Keep the lower wall edge inside the guide. Corners lock once their geometry is stable.</p>
           </div>
 
           <div class="guidance-checks">
@@ -170,20 +158,17 @@ onBeforeUnmount(() => timers.forEach(timer => clearTimeout(timer)))
   text-align: center;
 }
 
-.room-status strong,
-.room-status span {
-  display: block;
+.room-status h1 {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: -0.012em;
 }
 
-.room-status strong {
-  font-size: 0.8rem;
-  font-weight: 650;
-}
-
-.room-status span {
-  margin-top: 2px;
-  color: #82908c;
-  font-size: 0.62rem;
+.room-status p {
+  margin: 2px 0 0;
+  color: #8a9895;
+  font-size: 0.76rem;
 }
 
 .room-status i {
@@ -200,9 +185,8 @@ onBeforeUnmount(() => timers.forEach(timer => clearTimeout(timer)))
   align-items: center;
   justify-self: end;
   gap: 10px;
-  color: #9ba8a4;
-  font-size: 0.68rem;
-  font-variant-numeric: tabular-nums;
+  color: #8a9895;
+  font-size: 0.78rem;
 }
 
 .progress-readout > i {
@@ -222,73 +206,28 @@ onBeforeUnmount(() => timers.forEach(timer => clearTimeout(timer)))
 }
 
 .scan-content {
-  padding-block: 36px 52px;
+  padding-block: 24px 40px;
 }
 
-.scan-content > :deep(.scan-progress) {
-  width: min(720px, 100%);
-  margin-inline: auto;
-}
-
-.capture-heading {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 40px;
-  margin-top: 38px;
-  padding-top: 28px;
-  border-top: 1px solid rgb(255 255 255 / 9%);
-}
-
-.capture-heading .eyebrow,
-.guidance-main .eyebrow {
-  color: #82908c;
-}
-
-.capture-heading h1 {
-  margin: 7px 0 0;
-  font-size: clamp(1.9rem, 4vw, 2.85rem);
-  font-weight: 580;
-  letter-spacing: -0.045em;
-  line-height: 1.1;
-}
-
-.capture-heading > p {
-  max-width: 440px;
-  margin: 0;
-  color: #99a6a2;
-  font-size: 0.78rem;
-  line-height: 1.6;
-}
-
+/* The capture surface is the page. Everything else is a margin note. */
 .capture-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 310px;
+  grid-template-columns: minmax(0, 1fr) 300px;
   gap: 1px;
-  margin-top: 28px;
   overflow: hidden;
-  border: 1px solid #33403d;
-  border-radius: 16px;
-  background: #33403d;
+  border: 1px solid #2d3936;
+  border-radius: var(--radius-media);
+  background: #2d3936;
 }
 
 .capture-canvas {
   position: relative;
   display: grid;
   min-width: 0;
-  min-height: 520px;
+  min-height: min(780px, calc(100vh - 130px));
   place-items: center;
   overflow: hidden;
-  background: #111817;
-}
-
-.capture-canvas::before {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background: radial-gradient(circle at 48% 48%, rgb(73 104 97 / 22%), transparent 52%);
-  content: "";
-  pointer-events: none;
+  background: #0f1615;
 }
 
 .capture-canvas :deep(.geometry) {
@@ -307,9 +246,8 @@ onBeforeUnmount(() => timers.forEach(timer => clearTimeout(timer)))
   display: flex;
   align-items: center;
   justify-content: space-between;
-  color: #71817d;
-  font-size: 0.62rem;
-  font-weight: 620;
+  color: #788884;
+  font-size: 0.76rem;
 }
 
 .live-label {
@@ -349,60 +287,49 @@ onBeforeUnmount(() => timers.forEach(timer => clearTimeout(timer)))
   background: #17201f;
 }
 
-.guidance-index {
-  display: block;
-  margin-top: 30px;
-  color: #5f706c;
-  font-size: 0.68rem;
-  font-weight: 680;
-}
-
 .guidance-main h2 {
-  margin: 9px 0 0;
-  font-size: 1.35rem;
-  font-weight: 590;
-  letter-spacing: -0.03em;
-  line-height: 1.25;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.018em;
+  line-height: 1.35;
 }
 
 .guidance-main > p:last-child {
-  margin: 12px 0 0;
+  margin: 6px 0 0;
   color: #8e9d99;
-  font-size: 0.74rem;
-  line-height: 1.6;
+  font-size: 0.83rem;
+  line-height: 1.55;
 }
 
 .guidance-checks {
   display: grid;
-  gap: 1px;
-  margin-top: 28px;
-  border-block: 1px solid #2d3936;
-  background: #2d3936;
+  margin-top: 20px;
+  border-top: 1px solid #2d3936;
 }
 
 .guidance-checks > div {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 2px;
-  background: #17201f;
+  border-bottom: 1px solid #2d3936;
+  padding: 11px 0;
 }
 
 .guidance-checks > div > span {
   display: grid;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   flex: 0 0 auto;
   place-items: center;
   border: 1px solid #43504d;
   border-radius: 50%;
   color: #7e8c88;
-  font-size: 0.62rem;
+  font-size: 0.66rem;
 }
 
 .guidance-checks .is-detected > span {
   border-color: #3e6a61;
-  background: #25453f;
   color: #a5d0c7;
 }
 
@@ -413,23 +340,24 @@ onBeforeUnmount(() => timers.forEach(timer => clearTimeout(timer)))
   margin: 0;
 }
 
-.guidance-checks strong { font-size: 0.72rem; font-weight: 640; }
-.guidance-checks small { margin-top: 2px; color: #75827f; font-size: 0.61rem; }
+.guidance-checks strong { font-size: 0.83rem; font-weight: 560; }
+.guidance-checks small { margin-top: 1px; color: #7d8a86; font-size: 0.75rem; }
 
 .capture-button {
   width: 100%;
+  min-height: 38px;
   margin-top: auto;
-  background: #dfece8;
+  background: #e4eeeb;
   color: #13201d;
 }
 
 .capture-button:hover { background: #fff; }
-.capture-button svg { width: 16px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5; }
+.capture-button svg { width: 15px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5; }
 
 .prototype-note {
-  margin: 9px 0 0;
-  color: #62706d;
-  font-size: 0.58rem;
+  margin: 8px 0 0;
+  color: #6c7a76;
+  font-size: 0.73rem;
   text-align: center;
 }
 
@@ -441,20 +369,18 @@ onBeforeUnmount(() => timers.forEach(timer => clearTimeout(timer)))
   align-content: center;
   justify-items: center;
   padding: 30px;
-  background: rgb(14 22 20 / 91%);
-  backdrop-filter: blur(5px);
-  animation: overlay-in 180ms ease-out;
+  background: rgb(15 22 21 / 97%);
+  animation: overlay-in 160ms ease-out;
 }
 
 .completion-check {
   display: grid;
-  width: 50px;
-  height: 50px;
-  margin-bottom: 20px;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 18px;
   place-items: center;
   border: 1px solid #477a70;
   border-radius: 50%;
-  background: #203d37;
   color: #bce1d8;
 }
 
@@ -486,11 +412,9 @@ onBeforeUnmount(() => timers.forEach(timer => clearTimeout(timer)))
 }
 
 @media (max-width: 860px) {
-  .capture-heading { align-items: flex-start; flex-direction: column; gap: 14px; }
   .capture-workspace { grid-template-columns: 1fr; }
-  .capture-canvas { min-height: 480px; }
-  .capture-guidance { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
-  .guidance-index { margin-top: 18px; }
+  .capture-canvas { min-height: 420px; }
+  .capture-guidance { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
   .guidance-checks { margin-top: 0; }
   .capture-button { grid-column: 1 / -1; margin-top: 0; }
   .prototype-note { grid-column: 1 / -1; }
@@ -500,12 +424,10 @@ onBeforeUnmount(() => timers.forEach(timer => clearTimeout(timer)))
   .scan-shell { width: min(calc(100% - 28px), 1180px); }
   .scan-header-inner { grid-template-columns: auto 1fr auto; gap: 10px; }
   .room-status { overflow: hidden; }
-  .room-status strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .room-status h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .progress-readout > i { display: none; }
-  .scan-content { padding-block: 26px 36px; }
-  .capture-heading { margin-top: 28px; padding-top: 22px; }
-  .capture-workspace { margin-top: 20px; }
-  .capture-canvas { min-height: 365px; }
+  .scan-content { padding-block: 20px 32px; }
+  .capture-canvas { min-height: 340px; }
   .canvas-topbar { top: 13px; left: 14px; right: 14px; }
   .frame-corner--tl { top: 46px; left: 14px; }
   .frame-corner--tr { top: 46px; right: 14px; }

@@ -1,0 +1,28 @@
+{
+  "phase": "after",
+  "baseUrl": "http://127.0.0.1:3000",
+  "heights": {
+    "home-desktop": 1513,
+    "scan-desktop": 905,
+    "analysis-desktop": 1534,
+    "home-tablet": 1508,
+    "analysis-tablet": 2270,
+    "home-mobile": 1791,
+    "scan-mobile": 817,
+    "analysis-mobile": 2705
+  },
+  "analysisInventory": {
+    "surfaces": 5,
+    "gradients": 0,
+    "pills": 0,
+    "uppercase": 0,
+    "radii": {
+      "8px": 2,
+      "14px": 1,
+      "6px": 9,
+      "2px": 7,
+      "10px": 1
+    },
+    "shadows": 2
+  }
+}

@@ -48,17 +48,13 @@ const floorArea = computed(() => {
       <desc id="room-geometry-description">A perspective room perimeter with selectable width, length, and ceiling-height dimensions.</desc>
 
       <defs>
-        <linearGradient id="floorFill" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="currentColor" stop-opacity=".02" />
-          <stop offset="1" stop-color="currentColor" stop-opacity=".09" />
-        </linearGradient>
         <pattern id="gridPattern" width="24" height="24" patternUnits="userSpaceOnUse">
-          <path d="M24 0H0V24" fill="none" stroke="currentColor" stroke-opacity=".055" stroke-width="1" />
+          <path d="M24 0H0V24" fill="none" stroke="currentColor" stroke-opacity=".05" stroke-width="1" />
         </pattern>
       </defs>
 
-      <rect x="1" y="1" width="718" height="428" rx="18" fill="url(#gridPattern)" />
-      <path class="room-wall" d="M135 258 307 138 586 203 390 330Z" fill="url(#floorFill)" />
+      <rect x="0" y="0" width="720" height="430" fill="url(#gridPattern)" />
+      <path class="room-wall" d="M135 258 307 138 586 203 390 330Z" fill="currentColor" fill-opacity=".045" />
       <path class="room-edge room-edge--rear" d="M135 258 307 138 586 203" />
       <path class="room-edge" d="m135 258 255 72 196-127" />
       <path class="room-edge room-edge--vertical" d="M135 258v-91l172-95v66M586 203v-94L307 72" />
@@ -87,10 +83,11 @@ const floorArea = computed(() => {
         @keydown.space.prevent="choose('width')"
       >
         <path class="dimension-hit" d="M137 368h254" />
-        <path class="dimension-line" d="M137 368h254M137 357v22M391 357v22" />
-        <rect class="dimension-label-bg" x="218" y="345" width="94" height="44" rx="8" />
-        <text class="dimension-value" x="265" y="362">{{ measurement('width')?.value }} ft</text>
-        <text class="dimension-confidence" x="265" y="377">{{ Math.round((measurement('width')?.confidence ?? 0) * 100) }}% confidence</text>
+        <path class="dimension-line" d="M137 368h254M137 359v18M391 359v18" />
+        <circle class="dimension-node" cx="137" cy="368" r="2.4" />
+        <circle class="dimension-node" cx="391" cy="368" r="2.4" />
+        <rect class="dimension-label-bg" x="230" y="357" width="68" height="22" rx="4" />
+        <text class="dimension-value" x="264" y="372">{{ measurement('width')?.value }} ft</text>
       </g>
 
       <g
@@ -105,10 +102,11 @@ const floorArea = computed(() => {
         @keydown.space.prevent="choose('length')"
       >
         <path class="dimension-hit" d="M101 322 292 188" />
-        <path class="dimension-line" d="M101 322 292 188M94 314l14 17M285 180l14 17" />
-        <rect class="dimension-label-bg" x="118" y="240" width="96" height="44" rx="8" transform="rotate(-9 166 262)" />
-        <text class="dimension-value" x="166" y="258">{{ measurement('length')?.value }} ft</text>
-        <text class="dimension-confidence" x="166" y="273">{{ Math.round((measurement('length')?.confidence ?? 0) * 100) }}% confidence</text>
+        <path class="dimension-line" d="M101 322 292 188M95 315l12 14M286 181l12 14" />
+        <circle class="dimension-node" cx="101" cy="322" r="2.4" />
+        <circle class="dimension-node" cx="292" cy="188" r="2.4" />
+        <rect class="dimension-label-bg" x="163" y="244" width="68" height="22" rx="4" />
+        <text class="dimension-value" x="197" y="259">{{ measurement('length')?.value }} ft</text>
       </g>
 
       <g
@@ -123,10 +121,17 @@ const floorArea = computed(() => {
         @keydown.space.prevent="choose('height')"
       >
         <path class="dimension-hit" d="M627 111v93" />
-        <path class="dimension-line" d="M627 111v93M616 111h22M616 204h22" />
-        <rect class="dimension-label-bg" x="578" y="132" width="98" height="47" rx="8" />
-        <text class="dimension-value" x="627" y="150">{{ measurement('height')?.value }} ft</text>
-        <text class="dimension-confidence" x="627" y="166">{{ Math.round((measurement('height')?.confidence ?? 0) * 100) }}% · review</text>
+        <path class="dimension-line" d="M627 111v93M618 111h18M618 204h18" />
+        <circle class="dimension-node" cx="627" cy="111" r="2.4" />
+        <circle class="dimension-node" cx="627" cy="204" r="2.4" />
+        <rect class="dimension-label-bg" x="591" y="146" width="72" height="22" rx="4" />
+        <text class="dimension-value" x="627" y="161">
+          {{ measurement('height')?.value }} ft<tspan
+            v-if="(measurement('height')?.confidence ?? 1) < .75"
+            class="dimension-flag"
+            dx="4"
+          >▲</tspan>
+        </text>
       </g>
 
       <g class="origin-marker" aria-hidden="true">
@@ -161,9 +166,8 @@ const floorArea = computed(() => {
 <style scoped>
 .geometry {
   overflow: hidden;
-  border-radius: var(--radius-md);
-  background: #f6f7f3;
-  color: var(--color-ink);
+  background: var(--surface);
+  color: var(--text-primary);
 }
 
 .geometry--dark {
@@ -209,29 +213,35 @@ svg {
 .fixture text {
   fill: currentColor;
   font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 0.06em;
+  font-weight: 500;
   stroke: none;
   text-anchor: middle;
-  text-transform: uppercase;
 }
 
 .dimension {
-  color: var(--color-accent);
+  color: var(--text-secondary);
   outline: none;
-  transition: color 180ms ease, opacity 180ms ease;
+  transition: color 140ms ease;
+}
+
+.dimension--selected {
+  color: var(--accent);
 }
 
 .geometry--dark .dimension {
+  color: #9aa8a4;
+}
+
+.geometry--dark .dimension--selected {
   color: #8ec7bd;
 }
 
 .dimension--review {
-  color: var(--color-review);
+  color: var(--warning);
 }
 
 .geometry--dark .dimension--review {
-  color: #e2b768;
+  color: #d9ae63;
 }
 
 .dimension--interactive {
@@ -247,86 +257,81 @@ svg {
 .dimension-line {
   fill: none;
   stroke: currentColor;
-  stroke-linecap: round;
-  stroke-width: 1.5;
-  transition: stroke-width 160ms ease;
+  stroke-width: 1;
+  transition: stroke-width 140ms ease;
+}
+
+.dimension-node {
+  fill: currentColor;
 }
 
 .dimension-label-bg {
-  fill: #fff;
+  fill: var(--surface);
   stroke: currentColor;
-  stroke-opacity: 0.18;
+  stroke-opacity: 0.22;
 }
 
 .geometry--dark .dimension-label-bg {
   fill: #192321;
 }
 
-.dimension-value,
-.dimension-confidence {
-  fill: currentColor;
-  text-anchor: middle;
-}
-
 .dimension-value {
-  font-size: 13px;
-  font-weight: 720;
+  fill: currentColor;
+  font-size: 12px;
+  font-weight: 600;
+  text-anchor: middle;
   font-variant-numeric: tabular-nums;
 }
 
-.dimension-confidence {
-  font-size: 8.5px;
-  font-weight: 620;
-  opacity: 0.78;
+.dimension-flag {
+  font-size: 8px;
 }
 
 .dimension--selected .dimension-line,
 .dimension:focus .dimension-line,
 .dimension:hover .dimension-line {
-  stroke-width: 3;
+  stroke-width: 1.8;
 }
 
 .dimension--selected .dimension-label-bg,
 .dimension:focus .dimension-label-bg {
-  stroke-opacity: 0.9;
-  stroke-width: 2;
+  stroke-opacity: 1;
 }
 
 .origin-marker circle:first-child {
-  fill: var(--color-accent);
-  fill-opacity: 0.18;
+  fill: none;
 }
 
 .origin-marker circle:last-child {
-  fill: var(--color-accent);
+  fill: var(--text-tertiary);
 }
 
-.geometry--dark .origin-marker circle {
-  fill: #8ec7bd;
+.geometry--dark .origin-marker circle:last-child {
+  fill: #9aa8a4;
 }
 
 .geometry-footer {
   display: flex;
-  min-height: 58px;
+  min-height: 44px;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  border-top: 1px solid rgb(104 115 112 / 16%);
-  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  padding: 8px 14px;
 }
 
 .geometry-meta {
   display: flex;
   align-items: baseline;
-  gap: 6px;
-  color: var(--color-muted);
-  font-size: 0.72rem;
+  gap: 5px;
+  color: var(--text-tertiary);
+  font-size: 0.77rem;
 }
 
 .meta-value {
-  color: inherit;
-  font-size: 0.92rem;
-  font-weight: 720;
+  color: var(--text-primary);
+  font-size: 0.84rem;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
@@ -339,23 +344,26 @@ svg {
 
 .geometry-legend button {
   display: inline-flex;
-  min-height: 36px;
+  min-height: 30px;
   align-items: center;
   gap: 6px;
   border: 0;
-  border-radius: 7px;
-  padding: 7px 9px;
+  border-radius: var(--radius-control);
+  padding: 5px 8px;
   background: transparent;
-  color: var(--color-muted);
+  color: var(--text-tertiary);
   cursor: pointer;
-  font-size: 0.7rem;
-  font-weight: 650;
+  font-size: 0.77rem;
+  transition: color 140ms ease;
 }
 
-.geometry-legend button:hover,
+.geometry-legend button:hover {
+  color: var(--text-primary);
+}
+
 .geometry-legend .legend-button--selected {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
+  color: var(--accent);
+  font-weight: 560;
 }
 
 .geometry-legend button:disabled {
@@ -373,12 +381,15 @@ svg {
 
 .geometry--dark .geometry-meta,
 .geometry--dark .geometry-legend button {
-  color: #a9b7b3;
+  color: #96a4a0;
+}
+
+.geometry--dark .meta-value {
+  color: var(--text-inverse);
 }
 
 .geometry--dark .geometry-legend button:hover,
 .geometry--dark .geometry-legend .legend-button--selected {
-  background: rgb(142 199 189 / 12%);
   color: #a9d8cf;
 }
 

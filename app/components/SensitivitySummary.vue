@@ -10,237 +10,155 @@ withDefaults(defineProps<{
   errorMessage: null
 })
 
-const bandLabel: Record<RecommendationBand, string> = {
-  compact: 'Band A',
-  standard: 'Band B',
-  'high-capacity': 'Band C'
-}
+const bands: RecommendationBand[] = ['compact', 'standard', 'high-capacity']
 
-const bandDescription: Record<RecommendationBand, string> = {
-  compact: 'Compact',
-  standard: 'Standard',
-  'high-capacity': 'High capacity'
+const bandLabel: Record<RecommendationBand, string> = {
+  compact: 'Band A · Compact',
+  standard: 'Band B · Standard',
+  'high-capacity': 'Band C · High capacity'
 }
 </script>
 
 <template>
-  <section class="sensitivity surface" aria-labelledby="sensitivity-title" :aria-busy="pending">
-    <div class="section-heading">
-      <div>
-        <p class="eyebrow">Sensitivity model</p>
-        <h2 id="sensitivity-title">What could change this decision?</h2>
-      </div>
-      <span v-if="result">{{ result.scenarioCount }} scenarios</span>
+  <section class="sensitivity" aria-labelledby="sensitivity-title" :aria-busy="pending">
+    <div class="sensitivity-header">
+      <h2 id="sensitivity-title" class="section-label">Scenario sensitivity</h2>
+      <span v-if="result" class="scenario-count numeric">{{ result.scenarioCount }} scenarios</span>
     </div>
+    <p class="sensitivity-note">Where the planning band lands when every uncertain input is varied together.</p>
 
     <div v-if="pending && !result" class="sensitivity-loading">
-      <div class="skeleton" />
-      <div class="skeleton" />
-      <div class="skeleton" />
+      <div v-for="index in 3" :key="index" class="skeleton" />
     </div>
-    <div v-else-if="errorMessage && !result" class="state-panel" role="alert">
-      <p>Scenario analysis is unavailable until the decision engine reconnects.</p>
-    </div>
-    <div v-else-if="!result" class="state-panel">
-      <p>No sensitivity model can be shown without measurements.</p>
-    </div>
+    <p v-else-if="errorMessage && !result" class="sensitivity-fallback" role="alert">
+      Scenario analysis is unavailable until the decision engine reconnects.
+    </p>
+    <p v-else-if="!result" class="sensitivity-fallback">
+      No sensitivity model can be shown without measurements.
+    </p>
     <template v-else>
-      <div class="sensitivity-grid">
-        <div class="current-result">
-          <span>Current planning result</span>
-          <strong>{{ bandLabel[result.expectedBand] }}</strong>
-          <p>{{ bandDescription[result.expectedBand] }} planning range</p>
-          <dl>
-            <div><dt>Current index</dt><dd>{{ result.baselineIndex }}</dd></div>
-            <div><dt>Likely range</dt><dd>{{ result.likelyRange.low }}–{{ result.likelyRange.high }}</dd></div>
-          </dl>
+      <dl class="distribution">
+        <div v-for="band in bands" :key="band" :class="{ 'distribution--expected': band === result.expectedBand }">
+          <dt>{{ bandLabel[band] }}</dt>
+          <dd>
+            <span class="bar" aria-hidden="true"><i :style="{ width: `${result.bandDistribution[band] * 100}%` }" /></span>
+            <span class="numeric">{{ Math.round(result.bandDistribution[band] * 100) }}%</span>
+          </dd>
         </div>
+      </dl>
 
-        <div class="scenario-distribution">
-          <div class="distribution-title"><span>Across uncertainty scenarios</span><span>Probability</span></div>
-          <div v-for="band in (['compact', 'standard', 'high-capacity'] as RecommendationBand[])" :key="band" class="distribution-row">
-            <span>{{ bandLabel[band] }}</span>
-            <div class="bar"><i :style="{ width: `${result.bandDistribution[band] * 100}%` }" /></div>
-            <strong>{{ Math.round(result.bandDistribution[band] * 100) }}%</strong>
-          </div>
-          <div v-if="result.verificationQueue[0]" class="main-driver">
-            <span>Main uncertainty driver</span>
-            <strong>{{ result.verificationQueue[0].label }}</strong>
-            <p>{{ result.verificationQueue[0].reason }}</p>
-          </div>
-        </div>
-      </div>
+      <p v-if="result.verificationQueue[0]" class="driver">
+        <strong>{{ result.verificationQueue[0].label }}</strong> drives most of the remaining spread.
+        {{ result.verificationQueue[0].reason }}
+      </p>
     </template>
   </section>
 </template>
 
 <style scoped>
-.sensitivity {
-  padding: 24px;
-}
-
-.section-heading {
+.sensitivity-header {
   display: flex;
-  align-items: flex-start;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 20px;
+  gap: 16px;
 }
 
-.section-heading h2 {
-  margin: 5px 0 0;
-  font-size: 1.25rem;
-  font-weight: 680;
-  letter-spacing: -0.03em;
+.scenario-count {
+  color: var(--text-tertiary);
+  font-size: 0.77rem;
 }
 
-.section-heading > span {
-  color: var(--color-faint);
-  font-size: 0.67rem;
-}
-
-.sensitivity-grid {
-  display: grid;
-  grid-template-columns: minmax(180px, .7fr) 1.3fr;
-  gap: 1px;
-  margin-top: 20px;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: 11px;
-  background: var(--color-border);
-}
-
-.current-result,
-.scenario-distribution {
-  min-width: 0;
-  padding: 18px;
-  background: var(--color-surface);
-}
-
-.current-result > span,
-.distribution-title,
-.main-driver > span {
-  color: var(--color-muted);
-  font-size: 0.68rem;
-  font-weight: 590;
-}
-
-.current-result > strong {
-  display: block;
-  margin-top: 6px;
-  font-size: 2rem;
-  font-weight: 650;
-  letter-spacing: -0.045em;
-}
-
-.current-result > p {
-  margin: 0;
-  color: var(--color-muted);
-  font-size: 0.7rem;
-}
-
-.current-result dl {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin: 20px 0 0;
-}
-
-.current-result dt {
-  color: var(--color-faint);
-  font-size: 0.6rem;
-}
-
-.current-result dd {
+.sensitivity-note {
   margin: 3px 0 0;
-  font-size: 0.78rem;
-  font-weight: 680;
-  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+  font-size: 0.79rem;
 }
 
-.distribution-title {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 14px;
+.distribution {
+  margin: 14px 0 0;
 }
 
-.distribution-row {
+.distribution div {
   display: grid;
-  grid-template-columns: 54px minmax(60px, 1fr) 34px;
+  grid-template-columns: minmax(120px, 190px) minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
-  min-height: 28px;
-  color: var(--color-muted);
-  font-size: 0.68rem;
+  gap: 20px;
+  padding: 6px 0;
 }
 
-.distribution-row .bar {
-  height: 7px;
-  overflow: hidden;
+.distribution dt {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.distribution--expected dt {
+  color: var(--text-primary);
+  font-weight: 560;
+}
+
+.distribution dd {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+
+.bar {
+  display: block;
+  height: 4px;
   border-radius: 2px;
-  background: #e2e5df;
+  background: var(--surface-subtle);
 }
 
-.distribution-row i {
+.bar i {
   display: block;
   height: 100%;
   border-radius: 2px;
-  background: var(--color-accent);
-  transition: width 240ms ease;
+  background: var(--border-strong);
+  transition: width 200ms ease;
 }
 
-.distribution-row strong {
-  color: var(--color-ink);
-  font-size: 0.69rem;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
+.distribution--expected .bar i { background: var(--accent); }
 
-.main-driver {
-  margin-top: 15px;
-  border-top: 1px solid var(--color-border);
-  padding-top: 13px;
-}
-
-.main-driver strong {
-  display: block;
-  margin-top: 3px;
+.distribution dd .numeric {
+  color: var(--text-primary);
   font-size: 0.81rem;
+  text-align: right;
 }
 
-.main-driver p {
-  margin: 3px 0 0;
-  color: var(--color-muted);
-  font-size: 0.67rem;
-  line-height: 1.45;
+.driver {
+  margin: 12px 0 0;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.driver strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.sensitivity-fallback {
+  margin: 10px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
 }
 
 .sensitivity-loading {
   display: grid;
-  grid-template-columns: .7fr 1.3fr;
-  gap: 12px;
-  margin-top: 20px;
+  gap: 8px;
+  margin-top: 14px;
 }
 
-.sensitivity-loading .skeleton {
-  height: 160px;
-}
+.sensitivity-loading .skeleton { height: 20px; }
 
-.sensitivity-loading .skeleton:first-child {
-  grid-row: span 2;
-}
-
-.sensitivity-loading .skeleton:nth-child(2),
-.sensitivity-loading .skeleton:nth-child(3) {
-  height: 74px;
-}
-
-.state-panel {
-  margin-top: 20px;
-}
-
-@media (max-width: 620px) {
-  .sensitivity-grid {
+@media (max-width: 520px) {
+  .distribution div {
     grid-template-columns: 1fr;
+    gap: 4px;
   }
 }
 </style>

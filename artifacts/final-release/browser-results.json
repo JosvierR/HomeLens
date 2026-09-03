@@ -1,6 +1,6 @@
 {
-  "baseUrl": "https://homelens-kappa.vercel.app",
-  "generatedAt": "2026-09-03T04:20:37.004Z",
+  "baseUrl": "http://127.0.0.1:3000",
+  "generatedAt": "2026-09-03T04:58:23.414Z",
   "passed": true,
   "totals": {
     "checks": 19,
@@ -92,10 +92,10 @@
         "width": 320,
         "height": 568
       },
-      "href": "https://homelens-kappa.vercel.app/",
+      "href": "http://127.0.0.1:3000/",
       "title": "HomeLens",
-      "heading": "Decision confidence for the physical world.",
-      "textLength": 1164,
+      "heading": "Decision confidence for physical-world measurements.",
+      "textLength": 1187,
       "viewport": {
         "width": 320,
         "height": 568
@@ -115,10 +115,10 @@
         "width": 375,
         "height": 812
       },
-      "href": "https://homelens-kappa.vercel.app/",
+      "href": "http://127.0.0.1:3000/",
       "title": "HomeLens",
-      "heading": "Decision confidence for the physical world.",
-      "textLength": 1168,
+      "heading": "Decision confidence for physical-world measurements.",
+      "textLength": 1187,
       "viewport": {
         "width": 375,
         "height": 812
@@ -138,10 +138,10 @@
         "width": 430,
         "height": 932
       },
-      "href": "https://homelens-kappa.vercel.app/",
+      "href": "http://127.0.0.1:3000/",
       "title": "HomeLens",
-      "heading": "Decision confidence for the physical world.",
-      "textLength": 1168,
+      "heading": "Decision confidence for physical-world measurements.",
+      "textLength": 1187,
       "viewport": {
         "width": 430,
         "height": 932
@@ -161,10 +161,10 @@
         "width": 768,
         "height": 1024
       },
-      "href": "https://homelens-kappa.vercel.app/",
+      "href": "http://127.0.0.1:3000/",
       "title": "HomeLens",
-      "heading": "Decision confidence for the physical world.",
-      "textLength": 1243,
+      "heading": "Decision confidence for physical-world measurements.",
+      "textLength": 1187,
       "viewport": {
         "width": 768,
         "height": 1024
@@ -184,10 +184,10 @@
         "width": 1024,
         "height": 768
       },
-      "href": "https://homelens-kappa.vercel.app/",
+      "href": "http://127.0.0.1:3000/",
       "title": "HomeLens",
-      "heading": "Decision confidence for the physical world.",
-      "textLength": 1243,
+      "heading": "Decision confidence for physical-world measurements.",
+      "textLength": 1187,
       "viewport": {
         "width": 1024,
         "height": 768
@@ -207,10 +207,10 @@
         "width": 1280,
         "height": 800
       },
-      "href": "https://homelens-kappa.vercel.app/",
+      "href": "http://127.0.0.1:3000/",
       "title": "HomeLens",
-      "heading": "Decision confidence for the physical world.",
-      "textLength": 1243,
+      "heading": "Decision confidence for physical-world measurements.",
+      "textLength": 1187,
       "viewport": {
         "width": 1280,
         "height": 800
@@ -230,10 +230,10 @@
         "width": 1440,
         "height": 900
       },
-      "href": "https://homelens-kappa.vercel.app/",
+      "href": "http://127.0.0.1:3000/",
       "title": "HomeLens",
-      "heading": "Decision confidence for the physical world.",
-      "textLength": 1243,
+      "heading": "Decision confidence for physical-world measurements.",
+      "textLength": 1187,
       "viewport": {
         "width": 1440,
         "height": 900
@@ -253,10 +253,10 @@
         "width": 320,
         "height": 568
       },
-      "href": "https://homelens-kappa.vercel.app/scan",
+      "href": "http://127.0.0.1:3000/scan",
       "title": "HomeLens",
-      "heading": "Capture the room perimeter.",
-      "textLength": 692,
+      "heading": "Living Room",
+      "textLength": 441,
       "viewport": {
         "width": 320,
         "height": 568
@@ -276,10 +276,10 @@
         "width": 375,
         "height": 812
       },
-      "href": "https://homelens-kappa.vercel.app/scan",
+      "href": "http://127.0.0.1:3000/scan",
       "title": "HomeLens",
-      "heading": "Capture the room perimeter.",
-      "textLength": 692,
+      "heading": "Living Room",
+      "textLength": 441,
       "viewport": {
         "width": 375,
         "height": 812
@@ -299,10 +299,10 @@
         "width": 430,
         "height": 932
       },
-      "href": "https://homelens-kappa.vercel.app/scan",
+      "href": "http://127.0.0.1:3000/scan",
       "title": "HomeLens",
-      "heading": "Capture the room perimeter.",
-      "textLength": 692,
+      "heading": "Living Room",
+      "textLength": 441,
       "viewport": {
         "width": 430,
         "height": 932
@@ -322,10 +322,10 @@
         "width": 768,
         "height": 1024
       },
-      "href": "https://homelens-kappa.vercel.app/scan",
+      "href": "http://127.0.0.1:3000/scan",
       "title": "HomeLens",
-      "heading": "Capture the room perimeter.",
-      "textLength": 692,
+      "heading": "Living Room",
+      "textLength": 441,
       "viewport": {
         "width": 768,
         "height": 1024
@@ -345,10 +345,10 @@
         "width": 1024,
         "height": 768
       },
-      "href": "https://homelens-kappa.vercel.app/scan",
+      "href": "http://127.0.0.1:3000/scan",
       "title": "HomeLens",
-      "heading": "Capture the room perimeter.",
-      "textLength": 692,
+      "heading": "Living Room",
+      "textLength": 441,
       "viewport": {
         "width": 1024,
         "height": 768
@@ -368,10 +368,10 @@
         "width": 1280,
         "height": 800
       },
-      "href": "https://homelens-kappa.vercel.app/scan",
+      "href": "http://127.0.0.1:3000/scan",
       "title": "HomeLens",
-      "heading": "Capture the room perimeter.",
-      "textLength": 692,
+      "heading": "Living Room",
+      "textLength": 441,
       "viewport": {
         "width": 1280,
         "height": 800
@@ -391,10 +391,10 @@
         "width": 1440,
         "height": 900
       },
-      "href": "https://homelens-kappa.vercel.app/scan",
+      "href": "http://127.0.0.1:3000/scan",
       "title": "HomeLens",
-      "heading": "Capture the room perimeter.",
-      "textLength": 692,
+      "heading": "Living Room",
+      "textLength": 441,
       "viewport": {
         "width": 1440,
         "height": 900
@@ -414,10 +414,10 @@
         "width": 320,
         "height": 568
       },
-      "href": "https://homelens-kappa.vercel.app/analysis",
+      "href": "http://127.0.0.1:3000/analysis",
       "title": "HomeLens",
       "heading": "Living Room",
-      "textLength": 2514,
+      "textLength": 1691,
       "viewport": {
         "width": 320,
         "height": 568
@@ -437,10 +437,10 @@
         "width": 375,
         "height": 812
       },
-      "href": "https://homelens-kappa.vercel.app/analysis",
+      "href": "http://127.0.0.1:3000/analysis",
       "title": "HomeLens",
       "heading": "Living Room",
-      "textLength": 2552,
+      "textLength": 1691,
       "viewport": {
         "width": 375,
         "height": 812
@@ -460,10 +460,10 @@
         "width": 430,
         "height": 932
       },
-      "href": "https://homelens-kappa.vercel.app/analysis",
+      "href": "http://127.0.0.1:3000/analysis",
       "title": "HomeLens",
       "heading": "Living Room",
-      "textLength": 2552,
+      "textLength": 1691,
       "viewport": {
         "width": 430,
         "height": 932
@@ -483,10 +483,10 @@
         "width": 768,
         "height": 1024
       },
-      "href": "https://homelens-kappa.vercel.app/analysis",
+      "href": "http://127.0.0.1:3000/analysis",
       "title": "HomeLens",
       "heading": "Living Room",
-      "textLength": 2571,
+      "textLength": 1753,
       "viewport": {
         "width": 768,
         "height": 1024
@@ -506,10 +506,10 @@
         "width": 1024,
         "height": 768
       },
-      "href": "https://homelens-kappa.vercel.app/analysis",
+      "href": "http://127.0.0.1:3000/analysis",
       "title": "HomeLens",
       "heading": "Living Room",
-      "textLength": 2571,
+      "textLength": 1753,
       "viewport": {
         "width": 1024,
         "height": 768
@@ -529,10 +529,10 @@
         "width": 1280,
         "height": 800
       },
-      "href": "https://homelens-kappa.vercel.app/analysis",
+      "href": "http://127.0.0.1:3000/analysis",
       "title": "HomeLens",
       "heading": "Living Room",
-      "textLength": 2571,
+      "textLength": 1753,
       "viewport": {
         "width": 1280,
         "height": 800
@@ -552,10 +552,10 @@
         "width": 1440,
         "height": 900
       },
-      "href": "https://homelens-kappa.vercel.app/analysis",
+      "href": "http://127.0.0.1:3000/analysis",
       "title": "HomeLens",
       "heading": "Living Room",
-      "textLength": 2571,
+      "textLength": 1753,
       "viewport": {
         "width": 1440,
         "height": 900
@@ -574,8 +574,8 @@
     "navigation": {
       "homeLinks": {
         "identity": true,
-        "startHref": "https://homelens-kappa.vercel.app/scan",
-        "sampleHref": "https://homelens-kappa.vercel.app/analysis"
+        "startHref": "http://127.0.0.1:3000/scan",
+        "sampleHref": "http://127.0.0.1:3000/analysis"
       },
       "startNavigation": "/scan",
       "backNavigation": "/",
@@ -589,31 +589,31 @@
     "scanCompletion": {
       "buttonFound": true,
       "doubleCompletionGuard": true,
-      "href": "https://homelens-kappa.vercel.app/analysis",
+      "href": "http://127.0.0.1:3000/analysis",
       "hasAnalysisHeading": true
     },
     "geometrySelection": {
-      "widthCardSelected": true,
-      "heightCardSelected": false
+      "widthRowSelected": true,
+      "heightRowSelected": false
     },
     "verification": {
       "before": {
         "stability": "78%",
         "rescueAction": "Verify measurement",
         "source": "Estimated",
-        "calibration": "System confidenceIs model confidence trustworthy?Includes demo evidenceRaw model94%→Historically calibrated90%Comparable evidence20Calibration qualityModerateBased on 20 observations including synthetic demo evidence from matching capture context in the same confidence range. How was this calibrated? HomeLens compares prior model estimates with later human-verified measurements in the same confidence range. The prototype only applies an adjustment after explicit minimum sample thresholds are met. Raw confidence is always retained for inspection.",
-        "queue": "01Ceiling height71% raw → 68% calibrated16.8%impact02Length88% confidence6.2%impact03Width94% raw → 90% calibrated5.2%impact"
+        "calibration": "Confidence calibrationRaw model94%Calibrated90% Based on 20 comparable observations of moderate quality, including synthetic demo evidence. How calibration worksBased on 20 observations including synthetic demo evidence from matching capture context in the same confidence range.HomeLens compares earlier model estimates against later human-verified measurements in the same confidence range, and only applies an adjustment once a minimum sample threshold is met. Raw confidence is always retained.",
+        "queue": "1Ceiling height16.8%2Length6.2%3Width5.2%"
       },
       "inlineEditorOpened": true,
       "after": {
         "stability": "95%",
         "value": "9ft",
-        "source": "Human verified",
-        "provenance": "Original estimate: 9.1 ft · 71% model confidence",
-        "evidenceFeedback": "✓Verification saved. This correction added evidence to the calibration dataset.",
-        "rescueStatus": "✓No rescue neededThe current decision is already stable enough; no additional verification is required.",
+        "source": "Verified",
+        "provenance": "was 9.1 ft at 71%",
+        "evidenceFeedback": "Verification saved. This correction added evidence to the calibration dataset.",
+        "rescueStatus": "Nothing left to verify. The current decision is already stable enough; no additional verification is required.",
         "queueContainsHeight": false,
-        "calibration": "System confidenceIs model confidence trustworthy?Includes demo evidenceRaw model71%→Historically calibrated68%Comparable evidence38Calibration qualityModerateBased on 38 observations including synthetic demo evidence from matching capture context in the same confidence range. How was this calibrated? HomeLens compares prior model estimates with later human-verified measurements in the same confidence range. The prototype only applies an adjustment after explicit minimum sample thresholds are met. Raw confidence is always retained for inspection."
+        "calibration": "Confidence calibrationRaw model71%Calibrated68% Based on 38 comparable observations of moderate quality, including synthetic demo evidence. How calibration worksBased on 38 observations including synthetic demo evidence from matching capture context in the same confidence range.HomeLens compares earlier model estimates against later human-verified measurements in the same confidence range, and only applies an adjustment once a minimum sample threshold is met. Raw confidence is always retained."
       },
       "navigationPersistence": true,
       "resetState": {
@@ -623,13 +623,13 @@
       "invalidEdit": {
         "errorVisible": true,
         "submitDisabled": true,
-        "acceptedValue": "9.1ft"
+        "acceptedValue": null
       }
     },
     "accessibility": {
       "focusedTag": "a",
-      "focusedName": "Explore sample analysis",
-      "outlineWidth": "3px",
+      "focusedName": "Open sample",
+      "outlineWidth": "2px",
       "outlineStyle": "solid",
       "unnamedControls": 0,
       "unlabeledInputs": 0,
@@ -639,7 +639,7 @@
     "failureHandling": {
       "unavailableApiState": {
         "errorVisible": true,
-        "message": "Decision analysis could not be computed.[POST] \"/api/analysis\": <no response> Failed to fetchRetry analysis",
+        "message": "Decision analysis is temporarily unavailable.Your room measurements are still available.Retry analysis",
         "roomStillInspectable": true
       },
       "expectedFailureRuntimeIssues": []

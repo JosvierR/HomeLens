@@ -14,6 +14,7 @@
     "typecheck": "nuxt typecheck",
     "qa:api": "node scripts/api-qa.mjs",
     "qa:visual": "node scripts/visual-qa.mjs",
+    "qa:design": "node scripts/design-capture.mjs",
     "postinstall": "nuxt prepare"
   },
   "dependencies": {

@@ -14,18 +14,14 @@ const emit = defineEmits<{ select: [id: string] }>()
 </script>
 
 <template>
-  <section class="queue surface" aria-labelledby="queue-title" :aria-busy="pending">
-    <div class="queue-heading">
-      <div><p class="eyebrow">Verification queue</p><h2 id="queue-title">Ranked by decision impact</h2></div>
-      <span>impact × uncertainty</span>
-    </div>
+  <section class="queue" aria-labelledby="queue-title" :aria-busy="pending">
+    <h2 id="queue-title" class="section-label">Verification queue</h2>
+    <p class="queue-note">Ranked by how much each input can move the planning band.</p>
 
     <div v-if="pending && !items.length" class="queue-loading">
       <div v-for="index in 3" :key="index" class="skeleton" />
     </div>
-    <div v-else-if="!items.length" class="state-panel">
-      <p>No measurements need prioritization.</p>
-    </div>
+    <p v-else-if="!items.length" class="queue-empty">Every measurement is verified.</p>
     <ol v-else class="queue-list">
       <li v-for="(item, index) in items" :key="item.measurementId">
         <button
@@ -34,13 +30,9 @@ const emit = defineEmits<{ select: [id: string] }>()
           :aria-pressed="selectedId === item.measurementId"
           @click="emit('select', item.measurementId)"
         >
-          <span class="queue-rank">0{{ index + 1 }}</span>
-          <span class="queue-detail">
-            <strong>{{ item.label }}</strong>
-            <span v-if="item.calibrationApplied">{{ Math.round(item.rawConfidence * 100) }}% raw → {{ Math.round(item.confidence * 100) }}% calibrated</span>
-            <span v-else>{{ Math.round(item.confidence * 100) }}% confidence</span>
-          </span>
-          <span class="queue-impact">{{ item.impactPercent.toFixed(1) }}%<small>impact</small></span>
+          <span class="queue-rank numeric">{{ index + 1 }}</span>
+          <span class="queue-label">{{ item.label }}</span>
+          <span class="queue-impact numeric">{{ item.impactPercent.toFixed(1) }}%</span>
         </button>
       </li>
     </ol>
@@ -48,120 +40,72 @@ const emit = defineEmits<{ select: [id: string] }>()
 </template>
 
 <style scoped>
-.queue {
-  padding: 20px;
-}
-
-.queue-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.queue-heading h2 {
-  margin: 5px 0 0;
-  font-size: 0.97rem;
-  font-weight: 680;
-  letter-spacing: -0.02em;
-}
-
-.queue-heading > span {
-  color: var(--color-faint);
-  font-size: 0.6rem;
-  white-space: nowrap;
+.queue-note {
+  margin: 3px 0 0;
+  color: var(--text-tertiary);
+  font-size: 0.77rem;
+  line-height: 1.45;
 }
 
 .queue-list {
-  margin: 16px 0 0;
+  margin: 8px 0 0;
   padding: 0;
   list-style: none;
-}
-
-.queue-list li + li {
-  border-top: 1px solid var(--color-border);
-}
-
-.queue-item--selected {
-  background: var(--color-accent-soft) !important;
 }
 
 .queue-list button {
   display: grid;
   width: 100%;
-  min-height: 58px;
-  grid-template-columns: 27px 1fr auto;
-  align-items: center;
-  gap: 9px;
+  min-height: 34px;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
   border: 0;
-  border-radius: 8px;
-  padding: 9px 7px;
+  border-radius: var(--radius-control);
+  padding: 6px 6px 6px 0;
   background: transparent;
   cursor: pointer;
   text-align: left;
+  transition: color 140ms ease;
 }
 
-.queue-list button:hover {
-  background: var(--color-canvas);
+.queue-list button:hover { color: var(--accent); }
+
+.queue-item--selected {
+  padding-left: 8px !important;
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .queue-rank {
-  color: var(--color-faint);
-  font-size: 0.65rem;
-  font-weight: 680;
-  font-variant-numeric: tabular-nums;
-}
-
-.queue-detail {
-  min-width: 0;
-}
-
-.queue-detail strong,
-.queue-detail span {
-  display: block;
-}
-
-.queue-detail strong {
-  overflow: hidden;
+  color: var(--text-tertiary);
   font-size: 0.76rem;
-  font-weight: 670;
+}
+
+.queue-label {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 0.84rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.queue-detail span {
-  margin-top: 2px;
-  color: var(--color-muted);
-  font-size: 0.63rem;
-}
-
 .queue-impact {
-  color: var(--color-ink);
-  font-size: 0.74rem;
-  font-weight: 690;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  font-size: 0.81rem;
+  font-weight: 560;
 }
 
-.queue-impact small {
-  display: block;
-  color: var(--color-faint);
-  font-size: 0.55rem;
-  font-weight: 560;
+.queue-empty {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.81rem;
 }
 
 .queue-loading {
   display: grid;
-  gap: 9px;
-  margin-top: 16px;
+  gap: 6px;
+  margin-top: 10px;
 }
 
-.queue-loading .skeleton {
-  height: 50px;
-}
-
-.state-panel {
-  min-height: 120px;
-  margin-top: 16px;
-}
+.queue-loading .skeleton { height: 30px; }
 </style>

@@ -1,6 +1,6 @@
 {
-  "baseUrl": "https://homelens-kappa.vercel.app",
-  "generatedAt": "2026-09-03T04:19:28.891Z",
+  "baseUrl": "http://127.0.0.1:3000",
+  "generatedAt": "2026-09-03T04:57:22.056Z",
   "passed": true,
   "totals": {
     "checks": 41,
@@ -423,7 +423,7 @@
             "capturedAt": "2026-09-02T12:00:00.000Z"
           },
           "verification": {
-            "verifiedAt": "2026-09-03T04:19:29.586Z",
+            "verifiedAt": "2026-09-03T04:57:21.996Z",
             "verificationSource": "manual",
             "previousValue": 9.1,
             "previousConfidence": 0.71
@@ -448,7 +448,7 @@
           "capturedAt": "2026-09-02T12:00:00.000Z"
         },
         "verification": {
-          "verifiedAt": "2026-09-03T04:19:29.586Z",
+          "verifiedAt": "2026-09-03T04:57:21.996Z",
           "verificationSource": "manual",
           "previousValue": 9.1,
           "previousConfidence": 0.71
@@ -459,7 +459,7 @@
       "name": "evidence records error and stability",
       "passed": true,
       "details": {
-        "id": "evidence-9bff6d48-cdb8-4aaa-909b-075f0d249fcc",
+        "id": "evidence-12f71999-9cb6-434b-ad61-67cce4c5e4a0",
         "scanId": "api-qa-scan",
         "roomId": "api-qa-room",
         "measurementId": "height",
@@ -477,7 +477,7 @@
         "decisionStabilityBefore": 0.78,
         "decisionStabilityAfter": 0.9533333333333334,
         "stabilityGain": 0.17333333333333334,
-        "createdAt": "2026-09-03T04:19:29.586Z",
+        "createdAt": "2026-09-03T04:57:21.996Z",
         "demo": false
       }
     },
