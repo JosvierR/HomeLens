@@ -1,37 +1,53 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
+import { assessFrameQuality } from '~~/shared/frame-quality'
+
 const router = useRouter()
 const { scan } = useDemoScan()
 const { track } = useProductAnalytics()
-const { state: cameraState, stream, errorMessage, requestCamera, stopStream } = useCameraPermission()
+const {
+  state: cameraState,
+  stream,
+  errorMessage,
+  startCamera,
+  stopCamera,
+  bindVideo,
+  captureFrame,
+  videoEl
+} = useCamera()
 
 type CaptureMode = 'gate' | 'capturing' | 'processing' | 'complete'
 const mode = ref<CaptureMode>('gate')
 const guidanceStep = ref(0)
 const microFeedback = ref('')
 const capturedFlash = ref(false)
-const videoElement = ref<HTMLVideoElement | null>(null)
+const lastQualityNote = ref<string | null>(null)
+const usingDemo = ref(false)
 const timers: ReturnType<typeof setTimeout>[] = []
 
 const guidance = [
   {
+    title: 'Capture a room overview.',
+    hint: 'Keep walls and floor edges visible.',
+    feedback: 'Got it.',
+    target: 'room_overview'
+  },
+  {
     title: 'Point toward the opposite corner.',
     hint: 'Keep the floor edge in view while you move.',
-    feedback: 'Got it.'
+    feedback: 'That angle helps.',
+    target: 'opposite_corner'
   },
   {
     title: 'Great. Now capture the ceiling edge.',
-    hint: 'A little higher — that angle helps.',
-    feedback: 'That angle helps.'
+    hint: 'A little higher â€” that angle helps.',
+    feedback: 'We already have enough detail here.',
+    target: 'ceiling_edge'
   },
   {
-    title: 'One more view of the far wall.',
-    hint: 'Move slowly. We already have enough detail on the near side.',
-    feedback: 'We already have enough detail here.'
-  },
-  {
-    title: 'We have enough room geometry.',
+    title: 'That is enough for now.',
     hint: 'Finish when you are ready. HomeLens will check what is worth verifying.',
-    feedback: 'This measurement looks solid.'
+    feedback: 'This measurement looks solid.',
+    target: 'stop'
   }
 ]
 
@@ -46,38 +62,33 @@ const selectedDimension = computed(() => {
 })
 
 const statusLine = computed(() => {
-  if (mode.value === 'processing') return 'Analyzing what actually matters…'
-  if (mode.value === 'complete') return 'Opening your result…'
-  if (mode.value === 'capturing') return `Room capture · ${viewsCaptured.value} of ${guidance.length} useful views`
+  if (mode.value === 'processing') return 'Analyzing what actually mattersâ€¦'
+  if (mode.value === 'complete') return 'Opening your resultâ€¦'
+  if (mode.value === 'capturing') return `Room capture Â· ${viewsCaptured.value} of ${guidance.length} useful views`
   return 'Room capture'
 })
 
 const showCameraError = computed(() =>
-  ['denied', 'unavailable', 'no_camera', 'insecure_context'].includes(cameraState.value)
+  ['denied', 'unavailable', 'error'].includes(cameraState.value)
 )
 
-const bindVideo = async () => {
-  await nextTick()
-  if (videoElement.value && stream.value) {
-    videoElement.value.srcObject = stream.value
-    await videoElement.value.play().catch(() => undefined)
-  }
-}
-
 const startDemoCapture = () => {
-  stopStream()
+  stopCamera()
+  usingDemo.value = true
   mode.value = 'capturing'
   guidanceStep.value = 0
   microFeedback.value = ''
+  lastQualityNote.value = null
   track('scan_started', { captureMethod: 'simulated-geometry' })
 }
 
 const enableCamera = async () => {
-  await requestCamera()
-  if (cameraState.value === 'granted') {
+  usingDemo.value = false
+  await startCamera()
+  if (cameraState.value === 'active') {
     mode.value = 'capturing'
     guidanceStep.value = 0
-    await bindVideo()
+    await bindVideo(videoEl.value)
     track('scan_started', { captureMethod: 'camera' })
   }
 }
@@ -87,8 +98,27 @@ const flashCaptured = () => {
   timers.push(setTimeout(() => { capturedFlash.value = false }, 480))
 }
 
-const advanceGuidance = () => {
+const advanceGuidance = async () => {
   if (mode.value !== 'capturing') return
+
+  if (!usingDemo.value && cameraState.value === 'active' && currentGuidance.value.target !== 'stop') {
+    const frame = await captureFrame(currentGuidance.value.target)
+    if (frame) {
+      const quality = assessFrameQuality({
+        width: frame.width,
+        height: frame.height,
+        brightness: frame.brightness,
+        sharpness: frame.sharpness
+      })
+      if (quality.bucket === 'recapture_recommended') {
+        lastQualityNote.value = quality.reason ?? 'Try that view again.'
+        microFeedback.value = lastQualityNote.value
+        return
+      }
+      lastQualityNote.value = null
+    }
+  }
+
   flashCaptured()
   microFeedback.value = currentGuidance.value.feedback
   if (guidanceStep.value < guidance.length - 1) {
@@ -102,11 +132,11 @@ const advanceGuidance = () => {
 const completeCapture = () => {
   if (mode.value !== 'capturing' || !canFinish.value) return
   mode.value = 'processing'
-  stopStream()
+  stopCamera()
   track('scan_completed', {
     measurementCount: scan.value.measurements.length,
     unresolvedCount: unresolvedCount.value,
-    captureMethod: cameraState.value === 'granted' ? 'camera' : 'simulated-geometry'
+    captureMethod: usingDemo.value ? 'simulated-geometry' : 'camera'
   })
 
   const reduceMotion = import.meta.client && window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -115,11 +145,13 @@ const completeCapture = () => {
   timers.push(setTimeout(() => router.push('/analysis'), interval * 2 + (reduceMotion ? 60 : 220)))
 }
 
-watch(stream, () => { if (mode.value === 'capturing') bindVideo() })
+watch(stream, () => {
+  if (mode.value === 'capturing' && stream.value) bindVideo(videoEl.value)
+})
 
 onBeforeUnmount(() => {
   timers.forEach(timer => clearTimeout(timer))
-  stopStream()
+  stopCamera()
 })
 </script>
 
@@ -138,18 +170,17 @@ onBeforeUnmount(() => {
         <div class="progress-readout numeric" aria-live="polite">
           <template v-if="mode === 'capturing'">{{ viewsCaptured }}/{{ guidance.length }}</template>
           <template v-else-if="mode === 'gate'">Ready</template>
-          <template v-else>…</template>
+          <template v-else>â€¦</template>
         </div>
       </div>
     </header>
 
     <div class="scan-shell scan-content">
-      <!-- Permission gate: camera never requested on load -->
       <section v-if="mode === 'gate'" class="permission-gate" aria-labelledby="camera-gate-title">
-        <h2 id="camera-gate-title">We'll use your camera to capture the room.</h2>
-        <p>HomeLens does not need microphone access. You can also continue with the demo scan.</p>
+        <h2 id="camera-gate-title">Use your camera to capture the room.</h2>
+        <p>HomeLens only saves frames needed for analysis. It never records audio.</p>
 
-        <div v-if="cameraState === 'requesting'" class="gate-status" role="status">Asking for camera access…</div>
+        <div v-if="cameraState === 'requesting_permission'" class="gate-status" role="status">Asking for camera accessâ€¦</div>
 
         <div v-else-if="showCameraError" class="gate-error" role="alert">
           <p><strong>{{ errorMessage || 'Camera access is blocked.' }}</strong></p>
@@ -160,14 +191,17 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="button"
-            :disabled="cameraState === 'requesting'"
+            :disabled="cameraState === 'requesting_permission'"
             @click="enableCamera"
           >{{ showCameraError ? 'Try again' : 'Enable camera' }}</button>
           <button type="button" class="button button--secondary demo-scan-button" @click="startDemoCapture">
-            Use demo scan
+            Use demo instead
           </button>
         </div>
-        <p class="prototype-note">No camera imagery is stored in this prototype.</p>
+        <p class="prototype-note">
+          Demo mode stays local and does not invent dimensions from camera frames.
+          Sign in and create a project to store private evidence.
+        </p>
       </section>
 
       <section v-else class="capture-workspace" aria-labelledby="capture-surface-title">
@@ -181,7 +215,7 @@ onBeforeUnmount(() => {
 
           <video
             v-if="stream"
-            ref="videoElement"
+            ref="videoEl"
             class="camera-video"
             playsinline
             muted
@@ -205,7 +239,7 @@ onBeforeUnmount(() => {
           <div v-if="capturedFlash" class="capture-flash" role="status">Captured</div>
 
           <div v-if="mode !== 'capturing'" class="completion-overlay" role="status" aria-live="assertive">
-            <p class="is-visible">Analyzing what actually matters…</p>
+            <p class="is-visible">Analyzing what actually mattersâ€¦</p>
           </div>
         </div>
 
@@ -221,30 +255,20 @@ onBeforeUnmount(() => {
             <button
               v-if="!canFinish"
               type="button"
-              class="button button--secondary capture-step"
-              :disabled="mode !== 'capturing'"
+              class="button capture-button"
               @click="advanceGuidance"
             >
               Capture this view
             </button>
             <button
+              v-else
               type="button"
-              class="button capture-button"
-              :disabled="mode !== 'capturing' || !canFinish"
+              class="button capture-step"
               @click="completeCapture"
             >
-              <span>
-                {{
-                  mode === 'capturing'
-                    ? (canFinish ? 'Finish scan' : 'Keep capturing views')
-                    : mode === 'processing'
-                      ? 'Analyzing…'
-                      : 'Opening analysis…'
-                }}
-              </span>
+              Finish scan
             </button>
           </div>
-          <p class="prototype-note">No camera data is stored</p>
         </aside>
       </section>
     </div>

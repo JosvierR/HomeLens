@@ -6,3 +6,5 @@ node_modules
 artifacts/visual-qa/
 artifacts/functional-qa/
 .vercel
+supabase/.temp/
+supabase/.branches/

@@ -3,10 +3,23 @@ import { readBody, setResponseStatus } from 'h3'
 import type { ZodType } from 'zod'
 import { ZodError } from 'zod'
 
+export type ApiErrorCode =
+  | 'MALFORMED_JSON'
+  | 'INVALID_REQUEST'
+  | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
+  | 'NOT_FOUND'
+  | 'CONFLICT'
+  | 'UNPROCESSABLE'
+  | 'SERVICE_UNAVAILABLE'
+  | 'ENGINE_ERROR'
+  | 'INTERNAL_ERROR'
+
 export interface ApiErrorResponse {
   error: {
-    code: 'MALFORMED_JSON' | 'INVALID_REQUEST' | 'ENGINE_ERROR' | 'INTERNAL_ERROR'
+    code: ApiErrorCode
     message: string
+    requestId?: string
     issues?: Array<{ path: string, message: string }>
   }
 }
@@ -14,7 +27,7 @@ export interface ApiErrorResponse {
 export class ApiContractError extends Error {
   constructor(
     readonly statusCode: number,
-    readonly code: ApiErrorResponse['error']['code'],
+    readonly code: ApiErrorCode,
     message: string,
     readonly issues?: ApiErrorResponse['error']['issues']
   ) {

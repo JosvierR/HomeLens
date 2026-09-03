@@ -1,8 +1,8 @@
 # HomeLens
 
-**Decision confidence for physical-world software.**
+**Know what actually needs checking.**
 
-Physical-world measurements are imperfect. HomeLens determines which uncertainty can actually change a downstream decision, then asks a human to verify only what matters.
+HomeLens looks at uncertain room measurements and tells you which one is worth verifying before it can change the result.
 
 [![CI](https://github.com/JosvierR/HomeLens/actions/workflows/ci.yml/badge.svg)](https://github.com/JosvierR/HomeLens/actions/workflows/ci.yml)
 
@@ -10,96 +10,98 @@ Physical-world measurements are imperfect. HomeLens determines which uncertainty
 
 **[https://homelens-kappa.vercel.app](https://homelens-kappa.vercel.app)**
 
-No account and no secrets required. Capture is simulated.
+Public **Try demo** needs no account. Capture guidance works with camera permission or a local demo fallback.
+
+## Product vs demo
+
+| Mode | Auth | Persistence | Learning |
+|---|---|---|---|
+| Try demo | No | Local / synthetic | Isolated (`synthetic_demo`) |
+| Real product | Magic-link sign-in | Supabase Postgres + private Storage | `real_user_verification` only |
+
+## Production loop
+
+```text
+Camera → useful frames → estimates → raw confidence
+  → historical calibration → decision analysis
+  → Next Best Capture (or stop)
+  → human verification when needed
+  → persistent evidence → Error Atlas → future policy
+```
+
+## Stack
+
+- Nuxt 4 / Vue 3 / TypeScript / Nitro
+- Zod contracts + deterministic decision engines in `shared/`
+- Supabase Auth, Postgres RLS, private Storage
+- Optional PostHog (`NUXT_PUBLIC_POSTHOG_KEY`)
+
+## Local setup
+
+Node.js 22+.
 
 ```powershell
 npm ci
+copy .env.example .env
 npm run dev
 ```
 
-Open [http://127.0.0.1:3000](http://127.0.0.1:3000). Node.js 22+.
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000).
 
-![HomeLens landing page: know what needs checking, with a live room demo and recommendation](docs/screenshots/home.png)
+### Configure Supabase
 
-![Room capture with camera permission gate or guided demo views](docs/screenshots/scan.png)
-
-![Analysis page led by a plain-language recommendation and check action](docs/screenshots/analysis.png)
-
-## Why this exists
-
-Software that measures the physical world fails differently from ordinary CRUD software. Camera angle, occlusion, lighting, calibration, and geometry ambiguity can all produce plausible-looking but imperfect inputs.
-
-A system can be “confident enough” at the measurement layer and still unstable at the decision layer. HomeLens treats **decision stability** as a first-class product primitive.
-
-## What is technically interesting
-
-A low-confidence input is not automatically the most important input. HomeLens scores each measurement by both:
-
-1. **uncertainty** — how far the observed value could plausibly move
-2. **decision sensitivity** — how much that movement changes the downstream planning output
-
-Scan Rescue then asks for the smallest useful human verification. After a person confirms a value, HomeLens keeps the original estimate, records observed error and decision impact as evidence, and optionally calibrates future confidence. Raw model confidence is never overwritten.
-
-```text
-Capture
-  → measurement + provenance
-  → raw confidence
-  → calibration (or raw fallback)
-  → decision confidence
-  → Scan Rescue
-  → human verification
-  → ground-truth evidence
-  ↺ calibration
-```
-
-The calibration loop is a **data flywheel hypothesis**, not a proven business moat. See [docs/MOAT.md](docs/MOAT.md).
-
-## What this repository contains
-
-- Nuxt 4 app with simulated capture, analysis, and inline verification
-- strict server-validated `RoomScan` contracts (Zod)
-- original-estimate / accepted-value / verification provenance
-- deterministic uncertainty scenarios and bounded decision stability
-- impact-aware verification ranking and adaptive Scan Rescue
-- Ground Truth Calibration with ten confidence buckets and minimum-sample fallbacks
-- replaceable in-memory `EvidenceRepository`
-- privacy-restricted analytics allowlist (no analytics vendor is connected)
-- unit tests, live API QA, and browser/responsive/accessibility checks
-
-Core math lives in `shared/` and has no Vue or Nitro dependency.
-
-```text
-app/        UI, composables, interaction state
-server/     validated HTTP APIs, demo evidence, repository adapter
-shared/     domain contracts, decision engine, rescue, calibration, analytics
-tests/      deterministic domain and contract tests
-docs/       architecture, validation, security, and moat documentation
-```
-
-## Run and verify
+1. Create a Supabase project (or start local stack with Docker Desktop):
 
 ```powershell
-npm ci
-npm run dev
+npx supabase start
+npx supabase status -o env
 ```
+
+2. Set:
+
+```text
+NUXT_PUBLIC_SUPABASE_URL=...
+NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
+```
+
+Optional server-only:
+
+```text
+SUPABASE_SECRET_KEY=...
+```
+
+3. Apply migrations:
+
+```powershell
+npx supabase db reset
+# or against a linked remote:
+npx supabase db push
+```
+
+Never put a secret/service role key in `NUXT_PUBLIC_*`.
+
+## Verify
 
 ```powershell
 npm run test
 npm run typecheck
 npm run build
-npm run qa:api      # requires the dev server
-npm run qa:visual   # Chrome DevTools harness on Windows
+npm run qa:api      # requires dev server
+npm run qa:visual   # Chrome harness on Windows
 ```
 
-CI on GitHub Actions: Node 22, `npm ci`, test, typecheck, build.
+Database/RLS tests require a running local Supabase (`npx supabase test db`).
 
-PostHog is optional. If `NUXT_PUBLIC_POSTHOG_KEY` is empty, the app still runs.
+## Docs
 
-## Intentionally not implemented
+- [Architecture](docs/ARCHITECTURE.md)
+- [Database](docs/DATABASE.md)
+- [Learning system](docs/LEARNING_SYSTEM.md)
+- [Privacy](docs/PRIVACY_ARCHITECTURE.md)
+- [Moat hypothesis](docs/MOAT.md)
 
-- **Not** Manual J, certified HVAC sizing, or professional engineering recommendations
-- **Not** a real AR/LiDAR camera pipeline — capture is simulated and stores no imagery
-- **Not** production-trained calibration — the 72-record history is synthetic demo evidence
-- **Not** durable storage, auth, or multi-tenant evidence persistence
+## Intentionally not claimed
 
-The included planning index is an illustrative prototype rule. Do not use HomeLens to size real equipment.
+- Not Manual J / certified HVAC sizing
+- Not production-trained computer vision that fabricates room dimensions from arbitrary frames
+- Not a proven business moat until real evidence accumulates

@@ -19,7 +19,12 @@ export default defineNuxtConfig({
     }
   },
   runtimeConfig: {
+    // Server-only. Never expose via NUXT_PUBLIC_*.
+    supabaseSecretKey: '',
+    supabaseUrl: '',
     public: {
+      supabaseUrl: '',
+      supabasePublishableKey: '',
       posthogKey: '',
       posthogHost: 'https://us.i.posthog.com'
     }

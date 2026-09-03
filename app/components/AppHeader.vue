@@ -1,5 +1,7 @@
 <script setup lang="ts">
 const route = useRoute()
+const { configured, user, refresh } = useAuth()
+onMounted(() => { if (configured) refresh() })
 </script>
 
 <template>
@@ -13,7 +15,11 @@ const route = useRoute()
         <span>HomeLens</span>
       </NuxtLink>
 
-      <NuxtLink v-if="route.path !== '/scan'" to="/scan" class="header-action">New scan</NuxtLink>
+      <nav class="header-nav" aria-label="Primary">
+        <NuxtLink v-if="configured" to="/projects" class="header-action">Projects</NuxtLink>
+        <NuxtLink v-if="configured && !user" to="/auth/sign-in" class="header-action">Sign in</NuxtLink>
+        <NuxtLink v-if="route.path !== '/scan'" to="/scan" class="header-action">New scan</NuxtLink>
+      </nav>
     </div>
   </header>
 </template>
@@ -56,6 +62,12 @@ const route = useRoute()
   stroke: var(--canvas);
   stroke-linecap: round;
   stroke-width: 1;
+}
+
+.header-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
 }
 
 .header-action {

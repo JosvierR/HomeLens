@@ -4,32 +4,31 @@ HomeLens is an experimental prototype. It must not be used for safety-critical d
 
 ## Current data handling
 
-- The capture experience is simulated; no camera frames, photographs, or room imagery are collected.
-- The demo contains no address, user identity, account, or real device identifier.
-- Evidence is held in process memory and is lost when the server restarts.
-- Seed evidence is synthetic and marked with `demo: true`.
+- Demo capture can use the real browser camera for guided frames, or a local demo fallback.
+- Demo mode does not permanently store imagery.
+- Authenticated product mode stores private frames in Supabase Storage (`scan-evidence`) under `{user_id}/...`.
+- Frames are canvas-normalized (EXIF stripped, resized) before upload.
+- Microphone access is never requested.
+- Seed/demo calibration evidence is synthetic and isolated from production learning (`synthetic_demo`).
 - API error responses contain stable codes and validation paths, not internal stack traces.
 - Analytics properties are allowlisted. Room names, scan IDs, addresses, dimensions, images, notes, user identity, and device identifiers are discarded by the analytics abstraction.
-- No analytics vendor receives data in the current build.
-- Public runtime configuration contains no credential or server secret.
+- Public runtime configuration may include only the Supabase URL + publishable key. Secret keys stay server-only.
 
 ## Input and API controls
 
 All scan and verification payloads are validated server-side. The contracts reject non-finite or non-positive dimensions, values above the prototype maximum of 100 feet, confidence outside `0..1`, unknown units or sources, duplicate IDs, missing required dimensions, malformed JSON, and unexpected fields.
 
-## Before production persistence
+Authenticated product APIs additionally require a verified Supabase session and enforce row ownership (`auth.uid() = user_id`) in Postgres RLS.
 
-A production deployment must add:
+## Production persistence checklist
 
-- authentication, authorization, tenant isolation, and row-level access controls;
-- encryption in transit and at rest;
-- explicit consent for capture and calibration use;
-- evidence retention, deletion, export, and purpose-limitation policies;
-- separation of calibration features from directly identifying data;
-- aggregation or k-anonymity thresholds before contextual segments are exposed;
-- rate limiting, request-size limits, audit logs, abuse monitoring, and incident response;
-- controls preventing raw imagery or precise household geometry from entering analytics or application logs;
-- model/evidence versioning and rollback procedures;
-- secrets stored only in server-side environment or managed secret storage.
+- [x] Authentication (magic link / OTP)
+- [x] Row Level Security on user-owned tables
+- [x] Private Storage bucket + path-scoped policies
+- [x] Publishable key only in browser bundles
+- [ ] Linked remote Supabase project + applied migrations in production
+- [ ] Multi-user isolation proven against live project
+- [ ] Account deletion secret configured in Vercel
+- [ ] Evidence retention policy operations validated in production
 
 Never commit credentials. Local values belong in `.env`; only non-secret public configuration may be exposed through Nuxt runtime config.

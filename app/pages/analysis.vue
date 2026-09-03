@@ -48,6 +48,28 @@ const feedbackCopy = computed(() => {
   return { detail, nextLine }
 })
 
+const learningInsight = computed(() => {
+  const id = selectedMeasurementId.value ?? rescueAction.value?.measurementId
+  const suggestion = id ? calibration.value?.measurements[id] : null
+  const fallback = suggestion ?? Object.values(calibration.value?.measurements ?? {}).find(item => item.applied) ?? null
+  if (!fallback) {
+    return {
+      rawConfidence: recommendedMeasurement.value?.rawConfidence ?? recommendedMeasurement.value?.confidence ?? 0,
+      calibratedConfidence: null as number | null,
+      applied: false,
+      sampleCount: 0,
+      explanation: 'Not enough comparable history yet. Using model confidence.'
+    }
+  }
+  return {
+    rawConfidence: fallback.rawConfidence,
+    calibratedConfidence: fallback.applied ? fallback.calibratedConfidence : null,
+    applied: fallback.applied,
+    sampleCount: fallback.sampleCount,
+    explanation: fallback.reason
+  }
+})
+
 const selectMeasurement = (id: string) => { selectedMeasurementId.value = id }
 
 const startVerification = async (id: string) => {
@@ -274,6 +296,15 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
           :result="result"
           :pending="pending"
           :error-message="errorMessage"
+        />
+
+        <LearningInsight
+          class="learning-area"
+          :raw-confidence="learningInsight.rawConfidence"
+          :calibrated-confidence="learningInsight.calibratedConfidence"
+          :applied="learningInsight.applied"
+          :sample-count="learningInsight.sampleCount"
+          :explanation="learningInsight.explanation"
         />
 
         <CalibrationInsight
