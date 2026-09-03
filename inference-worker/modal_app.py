@@ -25,7 +25,10 @@ image = (
         "pip install --no-cache-dir -e /opt/depth-pro",
     )
     .pip_install_from_requirements(str(WORKER_DIR / "requirements.txt"))
-    .env({"DEPTH_PRO_CHECKPOINT": "/opt/depth-pro/checkpoints/depth_pro.pt"})
+    .env({
+        "DEPTH_PRO_CHECKPOINT": "/opt/depth-pro/checkpoints/depth_pro.pt",
+        "HOMELENS_WORKER_REVISION": "callback-softfail-1",
+    })
     .add_local_file(str(WORKER_DIR / "app.py"), "/opt/homelens/app.py", copy=True)
     .workdir("/opt/depth-pro")
 )

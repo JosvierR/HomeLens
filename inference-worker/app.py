@@ -299,6 +299,14 @@ def signed_callback(payload: dict, callback_url: str) -> None:
             "content-type": "application/json",
             "x-homelens-signature": signature,
         })
+        if response.is_error:
+            # Inference already finished; do not discard GPU work because delivery failed once.
+            print(
+                f"callback_delivery_failed status={response.status_code} "
+                f"jobId={payload.get('jobId')} scanId={payload.get('scanId')} "
+                f"body={response.text[:200]}"
+            )
+            return
         response.raise_for_status()
 
 
@@ -342,6 +350,20 @@ def process_job(job: JobRequest) -> None:
             "errorMessage": str(error)[:500],
             "completedAt": utc_now(),
         }
+    print(
+        f"job_complete jobId={job.jobId} status={payload['status']} "
+        f"depths={len(payload.get('depthResults', []))} "
+        f"observations={len(payload.get('measurementObservations', []))} "
+        f"error={payload.get('errorCode')}"
+    )
+    if payload.get("depthResults"):
+        sample = payload["depthResults"][0]
+        print(
+            f"depth_sample model={sample.get('modelVersion')} "
+            f"focalPx={sample.get('estimatedFocalLengthPx')} "
+            f"minM={sample.get('minDepthMeters')} maxM={sample.get('maxDepthMeters')} "
+            f"quality={sample.get('qualityScore')} ms={sample.get('processingTimeMs')}"
+        )
     signed_callback(payload, str(job.callbackUrl))
 
 
