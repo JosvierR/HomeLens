@@ -1,23 +1,27 @@
 export default defineNuxtConfig({
   compatibilityDate: '2026-09-01',
-  devtools: { enabled: true },
+  devtools: { enabled: false },
   modules: ['@nuxt/ui'],
   css: ['~/assets/css/main.css'],
+  devServer: {
+    host: '127.0.0.1',
+    port: 3000
+  },
   app: {
     head: {
       title: 'HomeLens',
       meta: [
         {
           name: 'description',
-          content: 'Confidence-aware home measurement and HVAC planning prototype.'
+          content: 'Decision confidence for physical-world measurements. HomeLens shows which uncertainty can change a downstream decision, then asks a human to verify only what matters.'
         }
       ]
     }
   },
   runtimeConfig: {
     public: {
-      posthogKey: process.env.NUXT_PUBLIC_POSTHOG_KEY || '',
-      posthogHost: process.env.NUXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com'
+      posthogKey: '',
+      posthogHost: 'https://us.i.posthog.com'
     }
   }
 })

@@ -1,31 +1,82 @@
-# Decision Confidence Engine
+# Decision, Rescue, and Calibration Logic
 
-## Problem
+## Public conventions
 
-A measurement can be uncertain without being important. Another measurement can look fairly reliable but sit close to a decision boundary where a small error matters.
+- Measurement confidence and decision stability are fractions in the inclusive range `0..1`.
+- UI percentages are formatting only.
+- Dimensions use feet and must be finite, greater than zero, and no greater than the prototype limit of 100 feet.
+- Identical input, sample count, and calibration overrides produce identical output.
 
-A generic "confidence badge" cannot answer the operational question:
+## Illustrative planning model
 
-> What should a human verify first?
+```text
+area = width * length
+volumeFactor = max(0.75, height / 8)
+planningIndex = area * volumeFactor + windows * 12 + doors * 8
+```
 
-## Approach
+Bands are `compact < 320`, `standard < 420`, and `high-capacity >= 420`. This is not an HVAC sizing formula.
 
-HomeLens evaluates measurement uncertainty and decision sensitivity. The engine runs deterministic uncertainty scenarios, observes how often the recommendation stays in the same planning band, and ranks measurements by expected decision impact.
+## Scenario uncertainty
 
-## Output
+```text
+uncertaintyFraction = (1 - effectiveConfidence) * 0.29
+sampledValue = acceptedValue * (1 + deterministicNoise * uncertaintyFraction)
+```
 
-- expected planning band
-- decision stability percentage
-- likely planning-index range
-- distribution across planning bands
-- ranked human verification queue
+Human-verified confidence `1` has zero spread. `bandStability` is the share of deterministic scenarios remaining in the baseline band.
 
-## Why deterministic scenarios?
+## Verification priority
 
-The current prototype uses deterministic pseudo-random samples so test runs and demos are reproducible. A production system could replace this with calibrated distributions learned from device, capture, room-type, or computer-vision performance data.
+For each unresolved measurement:
 
-## Not an HVAC calculator
+```text
+impactPercent = abs(highScenarioIndex - lowScenarioIndex) / baselineIndex
+priorityScore = impactPercent * (1 - effectiveConfidence) * 100
+```
 
-The planning index in this repository is deliberately illustrative. It is not Manual J, is not certified, and must not be used to size real equipment.
+The impact term comes from the downstream model. Therefore a 75%-reliable input with high sensitivity can outrank a 50%-reliable input with no downstream effect.
 
-The engineering contribution is the uncertainty/decision layer, not the placeholder thermal model.
+## Scan Rescue
+
+Scan Rescue does not treat the priority queue as a checklist. At each step it:
+
+1. simulates making each unresolved measurement exact;
+2. calculates the resulting decision stability;
+3. selects the largest positive gain, with priority score as a deterministic tie-breaker;
+4. repeats only when the first action does not meet the target;
+5. stops when stable, no unresolved measurements remain, or no action provides a positive gain.
+
+## Calibration tolerance
+
+The prototype calls an estimate successful when relative error against human ground truth is at most `3%`:
+
+```text
+relativeError = abs(estimatedValue - verifiedValue) / verifiedValue
+```
+
+This threshold is explicit and configurable. It is illustrative, not an HVAC or metrology industry standard.
+
+## Confidence buckets and ECE
+
+Evidence is grouped into `0–10%`, `10–20%`, through `90–100%`. Each bucket exposes sample count, average predicted confidence, observed success rate, mean absolute and relative error, and signed calibration gap:
+
+```text
+calibrationGap = averagePredictedConfidence - observedSuccessRate
+ECE = sum(abs(calibrationGap) * bucketSampleCount) / totalSampleCount
+```
+
+Positive gap means overconfidence; negative gap means underconfidence. Overall quality is only labeled after 20 samples. Context-specific adjustment additionally requires 12 scoped observations and 5 observations in the matching confidence bucket.
+
+## Confidence correction
+
+The suggested calibrated value is the observed success rate in the first sufficiently populated scope:
+
+```text
+exact model/capture/device/room context
+-> measurement type
+-> global
+-> unchanged raw confidence
+```
+
+The engine receives the calibrated value as an optional override. Raw confidence remains attached to the original estimate for provenance and debugging.

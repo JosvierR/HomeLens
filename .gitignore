@@ -3,3 +3,5 @@ node_modules
 .output
 .env
 .DS_Store
+artifacts/visual-qa/
+artifacts/functional-qa/

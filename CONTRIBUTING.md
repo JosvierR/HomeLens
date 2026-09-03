@@ -5,7 +5,7 @@ HomeLens is intentionally small and product-focused.
 ## Development
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 

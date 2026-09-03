@@ -11,16 +11,17 @@
 - verification priority
 - tests + CI
 
-## Milestone 1 — Scan Rescue
+## Milestone 1 — Scan Rescue + calibration prototype ✅
 
 Goal: ask for the smallest amount of additional human input needed to stabilize a decision.
 
-- define instability threshold
-- select highest-value verification
-- generate a single next action
-- recompute after correction
-- stop requesting input once stable
-- instrument rescue funnel
+- define instability threshold ✅
+- select highest-value verification ✅
+- plan the minimum useful next action sequence ✅
+- recompute after correction ✅
+- stop requesting input once stable ✅
+- record ground-truth evidence and calibrate with guarded fallbacks ✅
+- define a privacy-restricted analytics contract ✅
 
 ## Milestone 2 — Persistence
 

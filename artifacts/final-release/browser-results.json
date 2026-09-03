@@ -1,0 +1,650 @@
+{
+  "baseUrl": "http://127.0.0.1:3000",
+  "generatedAt": "2026-09-03T04:13:50.983Z",
+  "passed": true,
+  "totals": {
+    "checks": 19,
+    "passed": 19,
+    "failed": 0
+  },
+  "checks": [
+    {
+      "name": "home identity",
+      "passed": true
+    },
+    {
+      "name": "start scan navigation",
+      "passed": true
+    },
+    {
+      "name": "browser back",
+      "passed": true
+    },
+    {
+      "name": "browser forward",
+      "passed": true
+    },
+    {
+      "name": "analysis refresh",
+      "passed": true
+    },
+    {
+      "name": "scan completion guard",
+      "passed": true
+    },
+    {
+      "name": "scan reaches analysis",
+      "passed": true
+    },
+    {
+      "name": "geometry selection",
+      "passed": true
+    },
+    {
+      "name": "inline verification",
+      "passed": true
+    },
+    {
+      "name": "verified provenance",
+      "passed": true
+    },
+    {
+      "name": "verified item leaves queue",
+      "passed": true
+    },
+    {
+      "name": "reset restores demo",
+      "passed": true
+    },
+    {
+      "name": "invalid edit rejected",
+      "passed": true
+    },
+    {
+      "name": "api failure keeps geometry",
+      "passed": true
+    },
+    {
+      "name": "keyboard focus visible",
+      "passed": true
+    },
+    {
+      "name": "named controls",
+      "passed": true
+    },
+    {
+      "name": "confidence not color-only",
+      "passed": true
+    },
+    {
+      "name": "no page overflow",
+      "passed": true
+    },
+    {
+      "name": "no unexpected console errors",
+      "passed": true
+    }
+  ],
+  "pages": [
+    {
+      "route": "home",
+      "requestedViewport": {
+        "width": 320,
+        "height": 568
+      },
+      "href": "http://127.0.0.1:3000/",
+      "title": "HomeLens",
+      "heading": "Decision confidence for the physical world.",
+      "textLength": 1164,
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "documentWidth": 320,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "home-320x568.png"
+    },
+    {
+      "route": "home",
+      "requestedViewport": {
+        "width": 375,
+        "height": 812
+      },
+      "href": "http://127.0.0.1:3000/",
+      "title": "HomeLens",
+      "heading": "Decision confidence for the physical world.",
+      "textLength": 1168,
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "documentWidth": 375,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "home-375x812.png"
+    },
+    {
+      "route": "home",
+      "requestedViewport": {
+        "width": 430,
+        "height": 932
+      },
+      "href": "http://127.0.0.1:3000/",
+      "title": "HomeLens",
+      "heading": "Decision confidence for the physical world.",
+      "textLength": 1168,
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "documentWidth": 430,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "home-430x932.png"
+    },
+    {
+      "route": "home",
+      "requestedViewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "href": "http://127.0.0.1:3000/",
+      "title": "HomeLens",
+      "heading": "Decision confidence for the physical world.",
+      "textLength": 1243,
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "documentWidth": 768,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "home-768x1024.png"
+    },
+    {
+      "route": "home",
+      "requestedViewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "href": "http://127.0.0.1:3000/",
+      "title": "HomeLens",
+      "heading": "Decision confidence for the physical world.",
+      "textLength": 1243,
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "documentWidth": 1024,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "home-1024x768.png"
+    },
+    {
+      "route": "home",
+      "requestedViewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "href": "http://127.0.0.1:3000/",
+      "title": "HomeLens",
+      "heading": "Decision confidence for the physical world.",
+      "textLength": 1243,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "documentWidth": 1280,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "home-1280x800.png"
+    },
+    {
+      "route": "home",
+      "requestedViewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "href": "http://127.0.0.1:3000/",
+      "title": "HomeLens",
+      "heading": "Decision confidence for the physical world.",
+      "textLength": 1243,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "documentWidth": 1440,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "home-1440x900.png"
+    },
+    {
+      "route": "scan",
+      "requestedViewport": {
+        "width": 320,
+        "height": 568
+      },
+      "href": "http://127.0.0.1:3000/scan",
+      "title": "HomeLens",
+      "heading": "Capture the room perimeter.",
+      "textLength": 692,
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "documentWidth": 320,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "scan-320x568.png"
+    },
+    {
+      "route": "scan",
+      "requestedViewport": {
+        "width": 375,
+        "height": 812
+      },
+      "href": "http://127.0.0.1:3000/scan",
+      "title": "HomeLens",
+      "heading": "Capture the room perimeter.",
+      "textLength": 692,
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "documentWidth": 375,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "scan-375x812.png"
+    },
+    {
+      "route": "scan",
+      "requestedViewport": {
+        "width": 430,
+        "height": 932
+      },
+      "href": "http://127.0.0.1:3000/scan",
+      "title": "HomeLens",
+      "heading": "Capture the room perimeter.",
+      "textLength": 692,
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "documentWidth": 430,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "scan-430x932.png"
+    },
+    {
+      "route": "scan",
+      "requestedViewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "href": "http://127.0.0.1:3000/scan",
+      "title": "HomeLens",
+      "heading": "Capture the room perimeter.",
+      "textLength": 692,
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "documentWidth": 768,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "scan-768x1024.png"
+    },
+    {
+      "route": "scan",
+      "requestedViewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "href": "http://127.0.0.1:3000/scan",
+      "title": "HomeLens",
+      "heading": "Capture the room perimeter.",
+      "textLength": 692,
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "documentWidth": 1024,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "scan-1024x768.png"
+    },
+    {
+      "route": "scan",
+      "requestedViewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "href": "http://127.0.0.1:3000/scan",
+      "title": "HomeLens",
+      "heading": "Capture the room perimeter.",
+      "textLength": 692,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "documentWidth": 1280,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "scan-1280x800.png"
+    },
+    {
+      "route": "scan",
+      "requestedViewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "href": "http://127.0.0.1:3000/scan",
+      "title": "HomeLens",
+      "heading": "Capture the room perimeter.",
+      "textLength": 692,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "documentWidth": 1440,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "scan-1440x900.png"
+    },
+    {
+      "route": "analysis",
+      "requestedViewport": {
+        "width": 320,
+        "height": 568
+      },
+      "href": "http://127.0.0.1:3000/analysis",
+      "title": "HomeLens",
+      "heading": "Living Room",
+      "textLength": 2514,
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "documentWidth": 320,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "analysis-320x568.png"
+    },
+    {
+      "route": "analysis",
+      "requestedViewport": {
+        "width": 375,
+        "height": 812
+      },
+      "href": "http://127.0.0.1:3000/analysis",
+      "title": "HomeLens",
+      "heading": "Living Room",
+      "textLength": 2552,
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "documentWidth": 375,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "analysis-375x812.png"
+    },
+    {
+      "route": "analysis",
+      "requestedViewport": {
+        "width": 430,
+        "height": 932
+      },
+      "href": "http://127.0.0.1:3000/analysis",
+      "title": "HomeLens",
+      "heading": "Living Room",
+      "textLength": 2552,
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "documentWidth": 430,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "analysis-430x932.png"
+    },
+    {
+      "route": "analysis",
+      "requestedViewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "href": "http://127.0.0.1:3000/analysis",
+      "title": "HomeLens",
+      "heading": "Living Room",
+      "textLength": 2571,
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "documentWidth": 768,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "analysis-768x1024.png"
+    },
+    {
+      "route": "analysis",
+      "requestedViewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "href": "http://127.0.0.1:3000/analysis",
+      "title": "HomeLens",
+      "heading": "Living Room",
+      "textLength": 2571,
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "documentWidth": 1024,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "analysis-1024x768.png"
+    },
+    {
+      "route": "analysis",
+      "requestedViewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "href": "http://127.0.0.1:3000/analysis",
+      "title": "HomeLens",
+      "heading": "Living Room",
+      "textLength": 2571,
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "documentWidth": 1280,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "analysis-1280x800.png"
+    },
+    {
+      "route": "analysis",
+      "requestedViewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "href": "http://127.0.0.1:3000/analysis",
+      "title": "HomeLens",
+      "heading": "Living Room",
+      "textLength": 2571,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "documentWidth": 1440,
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "errorOverlay": false,
+      "frameworkErrorPage": false,
+      "unnamedButtons": 0,
+      "unlabeledInputs": 0,
+      "screenshot": "analysis-1440x900.png"
+    }
+  ],
+  "interactions": {
+    "navigation": {
+      "homeLinks": {
+        "identity": true,
+        "startHref": "http://127.0.0.1:3000/scan",
+        "sampleHref": "http://127.0.0.1:3000/analysis"
+      },
+      "startNavigation": "/scan",
+      "backNavigation": "/",
+      "forwardNavigation": "/scan",
+      "directAndRefresh": {
+        "path": "/analysis",
+        "heading": "Living Room",
+        "hasDecision": true
+      }
+    },
+    "scanCompletion": {
+      "buttonFound": true,
+      "doubleCompletionGuard": true,
+      "href": "http://127.0.0.1:3000/analysis",
+      "hasAnalysisHeading": true
+    },
+    "geometrySelection": {
+      "widthCardSelected": true,
+      "heightCardSelected": false
+    },
+    "verification": {
+      "before": {
+        "stability": "78%",
+        "rescueAction": "Verify measurement",
+        "source": "Estimated",
+        "calibration": "System confidenceIs model confidence trustworthy?Includes demo evidenceRaw model94%→Historically calibrated90%Comparable evidence20Calibration qualityModerateBased on 20 observations including synthetic demo evidence from matching capture context in the same confidence range. How was this calibrated? HomeLens compares prior model estimates with later human-verified measurements in the same confidence range. The prototype only applies an adjustment after explicit minimum sample thresholds are met. Raw confidence is always retained for inspection.",
+        "queue": "01Ceiling height71% raw → 68% calibrated16.8%impact02Length88% confidence6.2%impact03Width94% raw → 90% calibrated5.2%impact"
+      },
+      "inlineEditorOpened": true,
+      "after": {
+        "stability": "95%",
+        "value": "9ft",
+        "source": "Human verified",
+        "provenance": "Original estimate: 9.1 ft · 71% model confidence",
+        "evidenceFeedback": "✓Verification saved. This correction added evidence to the calibration dataset.",
+        "rescueStatus": "✓No rescue neededThe current decision is already stable enough; no additional verification is required.",
+        "queueContainsHeight": false,
+        "calibration": "System confidenceIs model confidence trustworthy?Includes demo evidenceRaw model71%→Historically calibrated68%Comparable evidence38Calibration qualityModerateBased on 38 observations including synthetic demo evidence from matching capture context in the same confidence range. How was this calibrated? HomeLens compares prior model estimates with later human-verified measurements in the same confidence range. The prototype only applies an adjustment after explicit minimum sample thresholds are met. Raw confidence is always retained for inspection."
+      },
+      "navigationPersistence": true,
+      "resetState": {
+        "value": "9.1ft",
+        "source": "Estimated"
+      },
+      "invalidEdit": {
+        "errorVisible": true,
+        "submitDisabled": true,
+        "acceptedValue": "9.1ft"
+      }
+    },
+    "accessibility": {
+      "focusedTag": "a",
+      "focusedName": "Explore sample analysis",
+      "outlineWidth": "3px",
+      "outlineStyle": "solid",
+      "unnamedControls": 0,
+      "unlabeledInputs": 0,
+      "confidenceUsesText": true,
+      "liveRegions": 0
+    },
+    "failureHandling": {
+      "unavailableApiState": {
+        "errorVisible": true,
+        "message": "Decision analysis could not be computed.[POST] \"/api/analysis\": <no response> Failed to fetchRetry analysis",
+        "roomStillInspectable": true
+      },
+      "expectedFailureRuntimeIssues": []
+    }
+  },
+  "normalRuntimeIssues": [],
+  "overflowPages": []
+}

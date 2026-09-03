@@ -1,7 +1,11 @@
-import { calculateDecisionConfidence, roomScanSchema } from '../../shared/decision-confidence'
+import { calculateDecisionConfidence, roomScanSchema } from '~~/shared/decision-confidence'
+import { apiFailure, readContractBody, runDomainEngine } from '../utils/api-contract'
 
 export default defineEventHandler(async event => {
-  const body = await readBody(event)
-  const scan = roomScanSchema.parse(body)
-  return calculateDecisionConfidence(scan)
+  try {
+    const scan = await readContractBody(event, roomScanSchema)
+    return runDomainEngine(() => calculateDecisionConfidence(scan))
+  } catch (error) {
+    return apiFailure(event, error)
+  }
 })

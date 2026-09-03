@@ -1,0 +1,566 @@
+{
+  "baseUrl": "http://127.0.0.1:3000",
+  "generatedAt": "2026-09-03T04:12:39.637Z",
+  "passed": true,
+  "totals": {
+    "checks": 41,
+    "passed": 41,
+    "failed": 0
+  },
+  "checks": [
+    {
+      "name": "valid decision payload",
+      "passed": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "name": "bounded stability contract",
+      "passed": true,
+      "details": {
+        "stability": 0.825
+      }
+    },
+    {
+      "name": "deterministic repeated API output",
+      "passed": true,
+      "details": {}
+    },
+    {
+      "name": "malformed JSON rejected",
+      "passed": true,
+      "details": {
+        "status": 400,
+        "code": "MALFORMED_JSON"
+      }
+    },
+    {
+      "name": "malformed JSON predictable safe error",
+      "passed": true,
+      "details": {
+        "error": {
+          "code": "MALFORMED_JSON",
+          "message": "Request body must contain valid JSON."
+        }
+      }
+    },
+    {
+      "name": "empty measurements rejected",
+      "passed": true,
+      "details": {
+        "status": 400,
+        "code": "INVALID_REQUEST"
+      }
+    },
+    {
+      "name": "empty measurements predictable safe error",
+      "passed": true,
+      "details": {
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "Request validation failed.",
+          "issues": [
+            {
+              "path": "measurements",
+              "message": "Too small: expected array to have >=3 items"
+            },
+            {
+              "path": "measurements",
+              "message": "Missing required measurement: width"
+            },
+            {
+              "path": "measurements",
+              "message": "Missing required measurement: length"
+            },
+            {
+              "path": "measurements",
+              "message": "Missing required measurement: height"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "missing required measurement rejected",
+      "passed": true,
+      "details": {
+        "status": 400,
+        "code": "INVALID_REQUEST"
+      }
+    },
+    {
+      "name": "missing required measurement predictable safe error",
+      "passed": true,
+      "details": {
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "Request validation failed.",
+          "issues": [
+            {
+              "path": "measurements",
+              "message": "Too small: expected array to have >=3 items"
+            },
+            {
+              "path": "measurements",
+              "message": "Missing required measurement: height"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "duplicate ids rejected",
+      "passed": true,
+      "details": {
+        "status": 400,
+        "code": "INVALID_REQUEST"
+      }
+    },
+    {
+      "name": "duplicate ids predictable safe error",
+      "passed": true,
+      "details": {
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "Request validation failed.",
+          "issues": [
+            {
+              "path": "measurements.1.id",
+              "message": "Duplicate measurement id: width"
+            },
+            {
+              "path": "measurements",
+              "message": "Missing required measurement: length"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "negative value rejected",
+      "passed": true,
+      "details": {
+        "status": 400,
+        "code": "INVALID_REQUEST"
+      }
+    },
+    {
+      "name": "negative value predictable safe error",
+      "passed": true,
+      "details": {
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "Request validation failed.",
+          "issues": [
+            {
+              "path": "measurements.0.value",
+              "message": "Too small: expected number to be >0"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "zero value rejected",
+      "passed": true,
+      "details": {
+        "status": 400,
+        "code": "INVALID_REQUEST"
+      }
+    },
+    {
+      "name": "zero value predictable safe error",
+      "passed": true,
+      "details": {
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "Request validation failed.",
+          "issues": [
+            {
+              "path": "measurements.0.value",
+              "message": "Too small: expected number to be >0"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "non-finite JSON value rejected",
+      "passed": true,
+      "details": {
+        "status": 400,
+        "code": "INVALID_REQUEST"
+      }
+    },
+    {
+      "name": "non-finite JSON value predictable safe error",
+      "passed": true,
+      "details": {
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "Request validation failed.",
+          "issues": [
+            {
+              "path": "measurements.0.value",
+              "message": "Invalid input: expected number, received null"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "extreme value rejected",
+      "passed": true,
+      "details": {
+        "status": 400,
+        "code": "INVALID_REQUEST"
+      }
+    },
+    {
+      "name": "extreme value predictable safe error",
+      "passed": true,
+      "details": {
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "Request validation failed.",
+          "issues": [
+            {
+              "path": "measurements.0.value",
+              "message": "Too big: expected number to be <=100"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "confidence above one rejected",
+      "passed": true,
+      "details": {
+        "status": 400,
+        "code": "INVALID_REQUEST"
+      }
+    },
+    {
+      "name": "confidence above one predictable safe error",
+      "passed": true,
+      "details": {
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "Request validation failed.",
+          "issues": [
+            {
+              "path": "measurements.0.confidence",
+              "message": "Too big: expected number to be <=1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "confidence below zero rejected",
+      "passed": true,
+      "details": {
+        "status": 400,
+        "code": "INVALID_REQUEST"
+      }
+    },
+    {
+      "name": "confidence below zero predictable safe error",
+      "passed": true,
+      "details": {
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "Request validation failed.",
+          "issues": [
+            {
+              "path": "measurements.0.confidence",
+              "message": "Too small: expected number to be >=0"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "unknown unit rejected",
+      "passed": true,
+      "details": {
+        "status": 400,
+        "code": "INVALID_REQUEST"
+      }
+    },
+    {
+      "name": "unknown unit predictable safe error",
+      "passed": true,
+      "details": {
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "Request validation failed.",
+          "issues": [
+            {
+              "path": "measurements.0.unit",
+              "message": "Invalid input: expected \"ft\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "unknown source rejected",
+      "passed": true,
+      "details": {
+        "status": 400,
+        "code": "INVALID_REQUEST"
+      }
+    },
+    {
+      "name": "unknown source predictable safe error",
+      "passed": true,
+      "details": {
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "Request validation failed.",
+          "issues": [
+            {
+              "path": "measurements.0.source",
+              "message": "Invalid option: expected one of \"estimated\"|\"manual\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "missing field rejected",
+      "passed": true,
+      "details": {
+        "status": 400,
+        "code": "INVALID_REQUEST"
+      }
+    },
+    {
+      "name": "missing field predictable safe error",
+      "passed": true,
+      "details": {
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "Request validation failed.",
+          "issues": [
+            {
+              "path": "measurements.0.label",
+              "message": "Invalid input: expected string, received undefined"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "consolidated analysis endpoint",
+      "passed": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "name": "calibration keeps raw and adjusted values separate",
+      "passed": true,
+      "details": {
+        "rawConfidence": 0.71,
+        "calibratedConfidence": 0.6666666666666666,
+        "applied": true,
+        "scope": "exact_context",
+        "sampleCount": 36,
+        "quality": "moderate",
+        "demoEvidence": true,
+        "reason": "Based on 36 observations including synthetic demo evidence from matching capture context in the same confidence range."
+      }
+    },
+    {
+      "name": "demo evidence is labeled",
+      "passed": true,
+      "details": {
+        "rawConfidence": 0.71,
+        "calibratedConfidence": 0.6666666666666666,
+        "applied": true,
+        "scope": "exact_context",
+        "sampleCount": 36,
+        "quality": "moderate",
+        "demoEvidence": true,
+        "reason": "Based on 36 observations including synthetic demo evidence from matching capture context in the same confidence range."
+      }
+    },
+    {
+      "name": "Scan Rescue returns adaptive actions",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "actions": 1
+      }
+    },
+    {
+      "name": "calibration endpoint reports evidence",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "sampleCount": 72
+      }
+    },
+    {
+      "name": "manual verification accepted",
+      "passed": true,
+      "details": {
+        "status": 200,
+        "measurement": {
+          "id": "height",
+          "label": "Ceiling height",
+          "value": 9,
+          "unit": "ft",
+          "confidence": 1,
+          "source": "manual",
+          "rawConfidence": 0.71,
+          "originalEstimate": {
+            "value": 9.1,
+            "confidence": 0.71,
+            "capturedAt": "2026-09-02T12:00:00.000Z"
+          },
+          "verification": {
+            "verifiedAt": "2026-09-03T04:12:39.589Z",
+            "verificationSource": "manual",
+            "previousValue": 9.1,
+            "previousConfidence": 0.71
+          }
+        }
+      }
+    },
+    {
+      "name": "original estimate and raw confidence preserved",
+      "passed": true,
+      "details": {
+        "id": "height",
+        "label": "Ceiling height",
+        "value": 9,
+        "unit": "ft",
+        "confidence": 1,
+        "source": "manual",
+        "rawConfidence": 0.71,
+        "originalEstimate": {
+          "value": 9.1,
+          "confidence": 0.71,
+          "capturedAt": "2026-09-02T12:00:00.000Z"
+        },
+        "verification": {
+          "verifiedAt": "2026-09-03T04:12:39.589Z",
+          "verificationSource": "manual",
+          "previousValue": 9.1,
+          "previousConfidence": 0.71
+        }
+      }
+    },
+    {
+      "name": "evidence records error and stability",
+      "passed": true,
+      "details": {
+        "id": "evidence-cb60e386-e057-4de7-8072-4e554af48c06",
+        "scanId": "api-qa-scan",
+        "roomId": "api-qa-room",
+        "measurementId": "height",
+        "measurementType": "height",
+        "estimatedValue": 9.1,
+        "estimatedConfidence": 0.71,
+        "verifiedValue": 9,
+        "absoluteError": 0.09999999999999964,
+        "relativeError": 0.011111111111111072,
+        "modelVersion": "geometry-v1",
+        "captureMethod": "simulated-geometry",
+        "deviceFamily": "demo-phone",
+        "roomCategory": "living-area",
+        "verificationSource": "manual",
+        "decisionStabilityBefore": 0.78,
+        "decisionStabilityAfter": 0.9533333333333334,
+        "stabilityGain": 0.17333333333333334,
+        "createdAt": "2026-09-03T04:12:39.589Z",
+        "demo": false
+      }
+    },
+    {
+      "name": "verified input removed from queue",
+      "passed": true,
+      "details": [
+        {
+          "measurementId": "length",
+          "label": "Length",
+          "confidence": 0.88,
+          "rawConfidence": 0.88,
+          "calibrationApplied": false,
+          "impactPercent": 6.207872484128051,
+          "priorityScore": 0.744944698095366,
+          "reason": "Lower expected decision impact than the measurements ranked above it."
+        },
+        {
+          "measurementId": "width",
+          "label": "Width",
+          "confidence": 0.9,
+          "rawConfidence": 0.94,
+          "calibratedConfidence": 0.9,
+          "calibrationApplied": true,
+          "impactPercent": 5.1732270701067,
+          "priorityScore": 0.5173227070106698,
+          "reason": "Lower expected decision impact than the measurements ranked above it."
+        }
+      ]
+    },
+    {
+      "name": "invalid edited value rejected by server",
+      "passed": true,
+      "details": {
+        "status": 400,
+        "payload": {
+          "error": {
+            "code": "INVALID_REQUEST",
+            "message": "Request validation failed.",
+            "issues": [
+              {
+                "path": "verifiedValue",
+                "message": "Too small: expected number to be >0"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "unknown measurement id rejected by server",
+      "passed": true,
+      "details": {
+        "status": 400,
+        "payload": {
+          "error": {
+            "code": "INVALID_REQUEST",
+            "message": "Request validation failed.",
+            "issues": [
+              {
+                "path": "measurementId",
+                "message": "Measurement does not exist in the supplied scan."
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "unknown measurement id returns field issue",
+      "passed": true,
+      "details": {
+        "error": {
+          "code": "INVALID_REQUEST",
+          "message": "Request validation failed.",
+          "issues": [
+            {
+              "path": "measurementId",
+              "message": "Measurement does not exist in the supplied scan."
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
