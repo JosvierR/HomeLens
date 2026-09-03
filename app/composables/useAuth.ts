@@ -39,12 +39,10 @@ export const useAuth = () => {
     authError.value = null
     try {
       const supabase = getClient()
-      const redirectTo = import.meta.client ? `${window.location.origin}/auth/callback` : undefined
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          shouldCreateUser: true,
-          emailRedirectTo: redirectTo
+          shouldCreateUser: true
         }
       })
       if (error) throw error

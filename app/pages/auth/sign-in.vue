@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 const email = ref('')
 const code = ref('')
 const step = ref<'email' | 'code'>('email')
@@ -52,7 +52,7 @@ const changeEmail = () => {
       <p class="brand-mark">HomeLens</p>
       <h1>Sign in to save real scans</h1>
       <p class="lede">
-        We’ll email a 6-digit code (and a backup link). The public demo still works without an account.
+        We’ll email you a 6-digit code. The public demo still works without an account.
       </p>
 
       <p v-if="!configured" class="notice" role="status">
@@ -82,7 +82,6 @@ const changeEmail = () => {
       <form v-else class="auth-form" @submit.prevent="verifyCode">
         <p class="notice" role="status">
           Enter the 6-digit code we sent to <strong>{{ email }}</strong>.
-          You can also open the sign-in link from that email.
         </p>
         <label>
           Sign-in code
