@@ -3,7 +3,7 @@ import type { RoomScan } from '~/types/scan'
 
 export const useHomeLensAnalysis = (scan: Ref<RoomScan>) => {
   const analysis = ref<HomeLensAnalysisResult | null>(null)
-  const pending = ref(false)
+  const pending = ref(true)
   const errorMessage = ref<string | null>(null)
   const requestCount = ref(0)
   let requestId = 0
