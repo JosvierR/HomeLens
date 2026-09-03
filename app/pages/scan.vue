@@ -157,6 +157,10 @@ const clearPoll = () => {
 }
 
 let sessionPrepareId = 0
+const userOwnsCaptureFlow = () => {
+  const current = mode.value
+  return current === 'capturing' || current === 'uploading' || current === 'estimating'
+}
 
 const enableCamera = async () => {
   submitError.value = null
@@ -509,15 +513,13 @@ const prepareScanSession = async () => {
     await loadProductRoom()
   }
 
-  if (prepareId !== sessionPrepareId) return
-  if (mode.value === 'capturing' || mode.value === 'uploading' || mode.value === 'estimating') return
+  if (prepareId !== sessionPrepareId || userOwnsCaptureFlow()) return
 
   const context = productContext.value
   if (!context) return
   try {
     const status = await $fetch<PhotoEstimationStatusResponse>(`/api/scans/${context.scanId}/estimation`)
-    if (prepareId !== sessionPrepareId) return
-    if (mode.value === 'capturing' || mode.value === 'uploading') return
+    if (prepareId !== sessionPrepareId || userOwnsCaptureFlow()) return
     estimationStatus.value = status
     const hasInferenceWork = Boolean(status.jobId) || status.progress.total > 0
     if (status.state === 'processing_geometry' && hasInferenceWork) {
