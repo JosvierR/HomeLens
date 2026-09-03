@@ -20,11 +20,12 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     // Server-only. Never expose via NUXT_PUBLIC_*.
-    supabaseSecretKey: '',
-    supabaseUrl: '',
+    // Override with NUXT_SUPABASE_SECRET_KEY / NUXT_SUPABASE_URL, or SUPABASE_* aliases.
+    supabaseSecretKey: process.env.NUXT_SUPABASE_SECRET_KEY || process.env.SUPABASE_SECRET_KEY || '',
+    supabaseUrl: process.env.NUXT_SUPABASE_URL || process.env.SUPABASE_URL || '',
     public: {
-      supabaseUrl: '',
-      supabasePublishableKey: '',
+      supabaseUrl: process.env.NUXT_PUBLIC_SUPABASE_URL || '',
+      supabasePublishableKey: process.env.NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '',
       posthogKey: '',
       posthogHost: 'https://us.i.posthog.com'
     }

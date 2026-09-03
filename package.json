@@ -15,10 +15,12 @@
     "qa:api": "node scripts/api-qa.mjs",
     "qa:visual": "node scripts/visual-qa.mjs",
     "qa:design": "node scripts/design-capture.mjs",
+    "qa:supabase": "node scripts/supabase-smoke.mjs",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
     "supabase:reset": "supabase db reset",
     "supabase:test": "supabase test db",
+    "supabase:push": "supabase db push --linked",
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
