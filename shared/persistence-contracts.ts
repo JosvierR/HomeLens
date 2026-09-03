@@ -35,6 +35,31 @@ export const captureEvidenceCompleteSchema = z.object({
   deviceFamily: z.string().trim().max(80).optional()
 }).strict()
 
+const completedMeasurementSchema = z.object({
+  key: z.enum(['width', 'length', 'height']),
+  label: z.string().trim().min(1).max(120),
+  value: z.number().finite().positive().max(100)
+}).strict()
+
+export const completeScanSchema = z.object({
+  roomName: z.string().trim().min(1).max(120),
+  measurements: z.array(completedMeasurementSchema).length(3).superRefine((measurements, context) => {
+    const keys = new Set(measurements.map(measurement => measurement.key))
+    for (const key of ['width', 'length', 'height'] as const) {
+      if (!keys.has(key)) {
+        context.addIssue({ code: 'custom', message: `Missing required measurement: ${key}` })
+      }
+    }
+    if (keys.size !== measurements.length) {
+      context.addIssue({ code: 'custom', message: 'Measurement keys must be unique.' })
+    }
+  }),
+  windows: z.number().int().min(0).max(100),
+  doors: z.number().int().min(0).max(100),
+  deviceFamily: z.string().trim().min(1).max(80),
+  acceptedFrameCount: z.number().int().min(3).max(20)
+}).strict()
+
 export const persistVerifySchema = z.object({
   scanId: z.string().uuid(),
   measurementId: z.string().uuid(),

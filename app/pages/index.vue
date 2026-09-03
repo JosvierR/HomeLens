@@ -13,7 +13,7 @@ const uncertain = computed(() =>
 const steps = [
   {
     title: 'Measure',
-    body: 'Capture the room. Each dimension keeps its own confidence so nothing is hidden.'
+    body: 'Capture clear room evidence, then enter measured dimensions. Camera photos are never presented as automatic scale.'
   },
   {
     title: 'Understand',
@@ -40,7 +40,7 @@ const steps = [
         </p>
         <div class="hero-actions">
           <NuxtLink to="/scan" class="button">Scan a room</NuxtLink>
-          <NuxtLink to="/analysis" class="button button--secondary">Try the demo</NuxtLink>
+          <NuxtLink to="/analysis?demo=1" class="button button--secondary">Try the demo</NuxtLink>
         </div>
       </section>
 
@@ -81,7 +81,7 @@ const steps = [
             </button>
           </div>
 
-          <NuxtLink to="/analysis" class="preview-next">
+          <NuxtLink to="/analysis?demo=1" class="preview-next">
             <span v-if="rescue.status === 'needs_verification'">
               HomeLens recommendation: Check {{ rescue.label?.toLowerCase() }}
             </span>
@@ -117,7 +117,7 @@ const steps = [
     <footer class="home-footer">
       <div class="page-container">
         <span>HomeLens</span>
-        <NuxtLink to="/analysis">Try the demo</NuxtLink>
+        <NuxtLink to="/analysis?demo=1">Try the demo</NuxtLink>
       </div>
     </footer>
   </div>

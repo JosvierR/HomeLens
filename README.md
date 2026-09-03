@@ -10,7 +10,7 @@ HomeLens looks at uncertain room measurements and tells you which one is worth v
 
 **[https://homelens-kappa.vercel.app](https://homelens-kappa.vercel.app)**
 
-Public **Try demo** needs no account. Capture guidance works with camera permission or a local demo fallback.
+Public **Try demo** needs no account and stays synthetic. **Scan a room** opens a real live-camera workflow; there is no demo overlay or synthetic completion path inside camera capture.
 
 ## Product vs demo
 
@@ -22,7 +22,7 @@ Public **Try demo** needs no account. Capture guidance works with camera permiss
 ## Production loop
 
 ```text
-Camera → useful frames → estimates → raw confidence
+Camera → locally validated frames → measured room inputs
   → historical calibration → decision analysis
   → Next Best Capture (or stop)
   → human verification when needed
@@ -103,5 +103,5 @@ Database/RLS tests require a running local Supabase (`npx supabase test db`).
 ## Intentionally not claimed
 
 - Not Manual J / certified HVAC sizing
-- Not production-trained computer vision that fabricates room dimensions from arbitrary frames
+- Not a claim that monocular browser photos can recover absolute room scale on every phone; real scans use explicit measured dimensions
 - Not a proven business moat until real evidence accumulates

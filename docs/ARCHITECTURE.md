@@ -9,9 +9,9 @@
 
 ### Capture
 
-Browser camera (`useCamera`) collects useful frames after intentional permission.
-Local quality heuristics and EXIF-stripping canvas normalize frames.
-Camera evidence does **not** invent certified dimensions.
+Browser camera (`useCamera`) collects useful frames after intentional permission, prefers the rear camera, and falls back to the phone's native camera picker when live preview is unavailable.
+Local resolution, exposure, blur, contrast, and clipping checks normalize frames through an EXIF-stripping canvas.
+Camera evidence does **not** invent absolute dimensions. Cross-device web capture pairs accepted frames with explicit measured inputs before decision analysis.
 
 ### Measurement
 

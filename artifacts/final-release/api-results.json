@@ -1,6 +1,6 @@
 {
   "baseUrl": "http://127.0.0.1:3000",
-  "generatedAt": "2026-09-03T05:53:39.397Z",
+  "generatedAt": "2026-09-03T06:47:40.621Z",
   "passed": true,
   "totals": {
     "checks": 41,
@@ -365,13 +365,13 @@
       "passed": true,
       "details": {
         "rawConfidence": 0.71,
-        "calibratedConfidence": 0.7,
+        "calibratedConfidence": 0.6666666666666666,
         "applied": true,
         "scope": "exact_context",
-        "sampleCount": 40,
-        "quality": "good",
+        "sampleCount": 36,
+        "quality": "moderate",
         "demoEvidence": true,
-        "reason": "Based on 40 observations including synthetic demo evidence from matching capture context in the same confidence range."
+        "reason": "Based on 36 observations including synthetic demo evidence from matching capture context in the same confidence range."
       }
     },
     {
@@ -379,13 +379,13 @@
       "passed": true,
       "details": {
         "rawConfidence": 0.71,
-        "calibratedConfidence": 0.7,
+        "calibratedConfidence": 0.6666666666666666,
         "applied": true,
         "scope": "exact_context",
-        "sampleCount": 40,
-        "quality": "good",
+        "sampleCount": 36,
+        "quality": "moderate",
         "demoEvidence": true,
-        "reason": "Based on 40 observations including synthetic demo evidence from matching capture context in the same confidence range."
+        "reason": "Based on 36 observations including synthetic demo evidence from matching capture context in the same confidence range."
       }
     },
     {
@@ -401,7 +401,7 @@
       "passed": true,
       "details": {
         "status": 200,
-        "sampleCount": 76
+        "sampleCount": 72
       }
     },
     {
@@ -423,7 +423,7 @@
             "capturedAt": "2026-09-02T12:00:00.000Z"
           },
           "verification": {
-            "verifiedAt": "2026-09-03T05:53:39.365Z",
+            "verifiedAt": "2026-09-03T06:47:40.550Z",
             "verificationSource": "manual",
             "previousValue": 9.1,
             "previousConfidence": 0.71
@@ -448,7 +448,7 @@
           "capturedAt": "2026-09-02T12:00:00.000Z"
         },
         "verification": {
-          "verifiedAt": "2026-09-03T05:53:39.365Z",
+          "verifiedAt": "2026-09-03T06:47:40.550Z",
           "verificationSource": "manual",
           "previousValue": 9.1,
           "previousConfidence": 0.71
@@ -459,7 +459,7 @@
       "name": "evidence records error and stability",
       "passed": true,
       "details": {
-        "id": "evidence-fc92869d-1647-4d23-9d54-173be621c2f7",
+        "id": "evidence-cfde0c86-0165-40fb-9013-f1a9486ccb55",
         "scanId": "api-qa-scan",
         "roomId": "api-qa-room",
         "measurementId": "height",
@@ -474,10 +474,10 @@
         "deviceFamily": "demo-phone",
         "roomCategory": "living-area",
         "verificationSource": "manual",
-        "decisionStabilityBefore": 0.8116666666666666,
+        "decisionStabilityBefore": 0.78,
         "decisionStabilityAfter": 0.9533333333333334,
-        "stabilityGain": 0.14166666666666672,
-        "createdAt": "2026-09-03T05:53:39.365Z",
+        "stabilityGain": 0.17333333333333334,
+        "createdAt": "2026-09-03T06:47:40.550Z",
         "demo": false
       }
     },

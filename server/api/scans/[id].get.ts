@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
 
     const { data: scan, error } = await supabase
       .from('scans')
-      .select('*')
+      .select('*, rooms(name, room_type, project_id)')
       .eq('id', id)
       .eq('user_id', user.id)
       .maybeSingle()

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { MeasurementEvidence } from '~~/shared/calibration'
 
-const { scan, verifyMeasurement, resetScan, verificationPending, verificationError } = useDemoScan()
+const route = useRoute()
+const { scan, isDemo, verifyMeasurement, resetScan, verificationPending, verificationError } = useDemoScan()
+if (route.query.demo === '1') resetScan()
 const { analysis, pending, errorMessage, analyze } = useHomeLensAnalysis(scan)
 const { track } = useProductAnalytics()
 
@@ -140,7 +142,7 @@ const reset = () => {
   verificationErrorId.value = null
   savedMeasurementId.value = null
   lastEvidence.value = null
-  announcement.value = 'Sample measurements restored.'
+  announcement.value = 'Demo measurements restored.'
 }
 
 watch(pending, (isPending, wasPending) => {
@@ -215,7 +217,8 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
           </p>
         </div>
         <div class="room-actions">
-          <button type="button" class="reset-link" @click="reset">Reset demo</button>
+          <button v-if="isDemo" type="button" class="reset-link" @click="reset">Reset demo</button>
+          <span v-else class="capture-source numeric" aria-label="Analysis source: real camera scan">Camera scan</span>
           <NuxtLink to="/scan" class="button button--secondary button--small">New scan</NuxtLink>
         </div>
       </header>
@@ -331,8 +334,12 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
       </div>
 
       <p class="model-note">
-        HomeLens uses a non-certified planning proxy in this demo. Its purpose is to show how measurement
-        uncertainty can be inspected and resolved before it changes a downstream decision.
+        <template v-if="isDemo">
+          This sample uses synthetic measurements to demonstrate scenario analysis. Start a new scan to use your camera and real values.
+        </template>
+        <template v-else>
+          This result uses the dimensions you entered after the camera evidence passed local quality checks. It does not infer absolute scale from uncalibrated photos.
+        </template>
       </p>
     </main>
   </div>
@@ -394,6 +401,11 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
 .reset-link:hover {
   color: var(--text-secondary);
   text-decoration-color: var(--border-strong);
+}
+
+.capture-source {
+  color: var(--text-tertiary);
+  font-size: 0.76rem;
 }
 
 .learning-feedback {

@@ -32,6 +32,7 @@ const createDemoScan = (): RoomScan => ({
 
 export const useDemoScan = () => {
   const scan = useState<RoomScan>('demo-scan', createDemoScan)
+  const isDemo = computed(() => scan.value.captureMethod === 'simulated-geometry')
   const verificationPending = useState<boolean>('demo-verification-pending', () => false)
   const verificationError = useState<string | null>('demo-verification-error', () => null)
   const lastEvidenceId = useState<string | null>('demo-last-evidence-id', () => null)
@@ -70,6 +71,23 @@ export const useDemoScan = () => {
     lastEvidenceId.value = null
   }
 
+  const replaceScan = (nextScan: RoomScan) => {
+    controller?.abort()
+    scan.value = structuredClone(nextScan)
+    verificationPending.value = false
+    verificationError.value = null
+    lastEvidenceId.value = null
+  }
+
   onBeforeUnmount(() => controller?.abort())
-  return { scan, verifyMeasurement, resetScan, verificationPending, verificationError, lastEvidenceId }
+  return {
+    scan,
+    isDemo,
+    replaceScan,
+    verifyMeasurement,
+    resetScan,
+    verificationPending,
+    verificationError,
+    lastEvidenceId
+  }
 }
