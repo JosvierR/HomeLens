@@ -6,7 +6,6 @@ export const useAuth = () => {
   const session = useState<Session | null>('auth-session', () => null)
   const loading = useState('auth-loading', () => false)
   const authError = useState<string | null>('auth-error', () => null)
-  const pendingEmail = useState<string | null>('auth-pending-email', () => null)
 
   const refresh = async () => {
     if (!configured) {
@@ -33,49 +32,41 @@ export const useAuth = () => {
     }
   }
 
-  const signInWithOtp = async (email: string) => {
+  const signInWithPassword = async (email: string, password: string) => {
     if (!configured) throw new Error('Supabase is not configured.')
     loading.value = true
     authError.value = null
     try {
       const supabase = getClient()
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: true
-        }
-      })
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
-      pendingEmail.value = email
-      return true
+      session.value = data.session
+      user.value = data.session?.user ?? data.user ?? null
+      return Boolean(data.session)
     } catch (error) {
-      authError.value = error instanceof Error ? error.message : 'Could not send sign-in code.'
+      authError.value = error instanceof Error ? error.message : 'Could not sign in.'
       return false
     } finally {
       loading.value = false
     }
   }
 
-  const verifyEmailOtp = async (email: string, token: string) => {
+  const signUpWithPassword = async (email: string, password: string) => {
     if (!configured) throw new Error('Supabase is not configured.')
     loading.value = true
     authError.value = null
     try {
       const supabase = getClient()
-      const cleaned = token.replace(/\s+/g, '')
-      const { data, error } = await supabase.auth.verifyOtp({
-        email,
-        token: cleaned,
-        type: 'email'
-      })
+      const { data, error } = await supabase.auth.signUp({ email, password })
       if (error) throw error
+      // Free-tier projects may require email confirmation. If a session is returned, continue.
       session.value = data.session
       user.value = data.session?.user ?? data.user ?? null
-      pendingEmail.value = null
-      return Boolean(data.session)
+      if (data.session) return { ok: true as const, needsConfirmation: false }
+      return { ok: true as const, needsConfirmation: true }
     } catch (error) {
-      authError.value = error instanceof Error ? error.message : 'That code did not work. Try again.'
-      return false
+      authError.value = error instanceof Error ? error.message : 'Could not create the account.'
+      return { ok: false as const, needsConfirmation: false }
     } finally {
       loading.value = false
     }
@@ -87,7 +78,6 @@ export const useAuth = () => {
     await supabase.auth.signOut()
     user.value = null
     session.value = null
-    pendingEmail.value = null
   }
 
   if (import.meta.client && configured) {
@@ -104,10 +94,9 @@ export const useAuth = () => {
     session,
     loading,
     authError,
-    pendingEmail,
     refresh,
-    signInWithOtp,
-    verifyEmailOtp,
+    signInWithPassword,
+    signUpWithPassword,
     signOut
   }
 }

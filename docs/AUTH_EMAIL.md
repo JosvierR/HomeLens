@@ -1,24 +1,25 @@
-# Auth email templates (hosted Supabase)
+# Auth (demo)
 
-HomeLens sign-in uses **email OTP codes** via `verifyOtp({ type: 'email' })`.
+HomeLens demo sign-in uses **email + password**.
 
-The Magic Link template must include `{{ .Token }}` so users receive a 6-digit code.
+OTP/magic-link email codes are intentionally not used for the hosted free-tier project: Supabase blocks Magic Link template edits on free projects created after 2026-06-03 when using the default email provider, so the inbox only receives a magic link and not a usable 6-digit code.
 
-## Free tier limitation
+## How to sign in
 
-Supabase blocks API/`config push` template edits on free projects that still use the **default email provider**:
+1. Open `/auth/sign-in`
+2. Create an account with email + password (min 6 characters)
+3. Sign in with the same credentials
 
-> Email template modification is not available for free tier projects using the default email provider.
+If Supabase has “Confirm email” enabled, open the confirmation email once, then sign in with password.
 
-### Fix (pick one)
+## Optional OTP later
 
-1. **Dashboard (if available):** Authentication → Email → Templates → Magic link  
-   Paste the HTML from `supabase/templates/magic_link.html` and subject `Your HomeLens sign-in code`.
+Local template for OTP-only email lives in `supabase/templates/magic_link.html`.
 
-2. **Custom SMTP** (required for API template pushes on free tier): configure SMTP under Authentication → SMTP, then run:
+To enable OTP codes on hosted Supabase:
 
-```powershell
-npx supabase config push --yes
-```
+1. Configure custom SMTP under Authentication → SMTP, **or** upgrade the plan
+2. Set the Magic Link template subject/body to show only `{{ .Token }}`
+3. Restore `signInWithOtp` / `verifyOtp` in the app
 
-Until the template includes `{{ .Token }}`, users can still sign in with the **email link** (`/auth/callback`). Code entry works as soon as the template is updated.
+Until then, password login is the supported demo path.

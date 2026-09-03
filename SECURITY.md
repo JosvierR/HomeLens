@@ -22,7 +22,7 @@ Authenticated product APIs additionally require a verified Supabase session and 
 
 ## Production persistence checklist
 
-- [x] Authentication (magic link / OTP)
+- [x] Authentication (email + password demo login)
 - [x] Row Level Security on user-owned tables
 - [x] Private Storage bucket + path-scoped policies
 - [x] Publishable key only in browser bundles

@@ -1,47 +1,50 @@
 ﻿<script setup lang="ts">
 const email = ref('')
-const code = ref('')
-const step = ref<'email' | 'code'>('email')
+const password = ref('')
+const mode = ref<'signin' | 'signup'>('signin')
+const notice = ref<string | null>(null)
 const router = useRouter()
 const {
   configured,
   loading,
   authError,
-  signInWithOtp,
-  verifyEmailOtp,
+  signInWithPassword,
+  signUpWithPassword,
   user,
-  refresh,
-  pendingEmail
+  refresh
 } = useAuth()
 
 onMounted(async () => {
   await refresh()
-  if (pendingEmail.value) {
-    email.value = pendingEmail.value
-    step.value = 'code'
-  }
 })
 
 watch(user, (next) => {
   if (next) router.replace('/projects')
 })
 
-const sendCode = async () => {
-  const ok = await signInWithOtp(email.value.trim())
-  if (ok) {
-    step.value = 'code'
-    code.value = ''
+const submit = async () => {
+  notice.value = null
+  const cleanEmail = email.value.trim().toLowerCase()
+  const cleanPassword = password.value
+  if (cleanPassword.length < 6) {
+    notice.value = 'Use at least 6 characters for the password.'
+    return
   }
-}
 
-const verifyCode = async () => {
-  const ok = await verifyEmailOtp(email.value.trim(), code.value.trim())
-  if (ok) await router.replace('/projects')
-}
+  if (mode.value === 'signin') {
+    const ok = await signInWithPassword(cleanEmail, cleanPassword)
+    if (ok) await router.replace('/projects')
+    return
+  }
 
-const changeEmail = () => {
-  step.value = 'email'
-  code.value = ''
+  const result = await signUpWithPassword(cleanEmail, cleanPassword)
+  if (!result.ok) return
+  if (result.needsConfirmation) {
+    notice.value = 'Account created. If email confirmation is enabled, open the email then sign in here with the same password.'
+    mode.value = 'signin'
+    return
+  }
+  await router.replace('/projects')
 }
 </script>
 
@@ -50,9 +53,9 @@ const changeEmail = () => {
     <AppHeader />
     <section class="auth-card">
       <p class="brand-mark">HomeLens</p>
-      <h1>Sign in to save real scans</h1>
+      <h1>{{ mode === 'signin' ? 'Sign in' : 'Create account' }}</h1>
       <p class="lede">
-        We’ll email you a 6-digit code. The public demo still works without an account.
+        Demo login with email and password. No magic link. The public demo still works without an account.
       </p>
 
       <p v-if="!configured" class="notice" role="status">
@@ -63,7 +66,7 @@ const changeEmail = () => {
         Signed in. <NuxtLink to="/projects">Open projects</NuxtLink>
       </p>
 
-      <form v-else-if="step === 'email'" class="auth-form" @submit.prevent="sendCode">
+      <form v-else class="auth-form" @submit.prevent="submit">
         <label>
           Email
           <input
@@ -74,43 +77,31 @@ const changeEmail = () => {
             placeholder="you@example.com"
           >
         </label>
-        <button class="button" type="submit" :disabled="loading || !configured">
-          {{ loading ? 'Sending…' : 'Send sign-in code' }}
-        </button>
-      </form>
-
-      <form v-else class="auth-form" @submit.prevent="verifyCode">
-        <p class="notice" role="status">
-          Enter the 6-digit code we sent to <strong>{{ email }}</strong>.
-        </p>
         <label>
-          Sign-in code
+          Password
           <input
-            v-model="code"
-            class="code-input"
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            pattern="[0-9 ]*"
-            maxlength="8"
+            v-model="password"
+            type="password"
             required
-            placeholder="123456"
-            aria-describedby="code-hint"
+            minlength="6"
+            autocomplete="current-password"
+            placeholder="At least 6 characters"
           >
         </label>
-        <p id="code-hint" class="hint">6-digit code from your email</p>
-        <button class="button" type="submit" :disabled="loading || code.trim().length < 6">
-          {{ loading ? 'Checking…' : 'Verify code' }}
+        <button class="button" type="submit" :disabled="loading || !configured">
+          {{ loading ? 'Working…' : mode === 'signin' ? 'Sign in' : 'Create account' }}
         </button>
-        <div class="secondary-actions">
-          <button type="button" class="text-button" :disabled="loading" @click="sendCode">
-            Resend code
-          </button>
-          <button type="button" class="text-button" :disabled="loading" @click="changeEmail">
-            Use a different email
-          </button>
-        </div>
+        <button
+          type="button"
+          class="text-button"
+          :disabled="loading"
+          @click="mode = mode === 'signin' ? 'signup' : 'signin'; notice = null"
+        >
+          {{ mode === 'signin' ? 'Need an account? Create one' : 'Already have an account? Sign in' }}
+        </button>
       </form>
 
+      <p v-if="notice" class="notice" role="status">{{ notice }}</p>
       <p v-if="authError" class="error" role="alert">{{ authError }}</p>
 
       <p class="secondary-links">
@@ -141,14 +132,10 @@ h1 {
   font-size: clamp(1.6rem, 3vw, 2rem);
   letter-spacing: -0.03em;
 }
-.lede, .notice, .secondary-links, .hint {
+.lede, .notice, .secondary-links {
   color: var(--text-secondary);
   font-size: 0.95rem;
   line-height: 1.5;
-}
-.hint {
-  margin: -4px 0 0;
-  font-size: 0.82rem;
 }
 .auth-form {
   display: grid;
@@ -167,18 +154,8 @@ input {
   border-radius: 8px;
   background: var(--surface);
 }
-.code-input {
-  letter-spacing: 0.28em;
-  font-size: 1.15rem;
-  font-variant-numeric: tabular-nums;
-}
 .error { color: #9b2c2c; }
 .secondary-links { margin-top: 24px; }
-.secondary-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
 .text-button {
   border: 0;
   background: transparent;
@@ -187,6 +164,7 @@ input {
   text-decoration: underline;
   cursor: pointer;
   padding: 0;
+  text-align: left;
 }
 .text-button:disabled {
   opacity: 0.5;
