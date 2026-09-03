@@ -1,6 +1,6 @@
 {
-  "baseUrl": "http://127.0.0.1:3000",
-  "generatedAt": "2026-09-03T04:13:50.983Z",
+  "baseUrl": "https://homelens-kappa.vercel.app",
+  "generatedAt": "2026-09-03T04:20:37.004Z",
   "passed": true,
   "totals": {
     "checks": 19,
@@ -92,7 +92,7 @@
         "width": 320,
         "height": 568
       },
-      "href": "http://127.0.0.1:3000/",
+      "href": "https://homelens-kappa.vercel.app/",
       "title": "HomeLens",
       "heading": "Decision confidence for the physical world.",
       "textLength": 1164,
@@ -115,7 +115,7 @@
         "width": 375,
         "height": 812
       },
-      "href": "http://127.0.0.1:3000/",
+      "href": "https://homelens-kappa.vercel.app/",
       "title": "HomeLens",
       "heading": "Decision confidence for the physical world.",
       "textLength": 1168,
@@ -138,7 +138,7 @@
         "width": 430,
         "height": 932
       },
-      "href": "http://127.0.0.1:3000/",
+      "href": "https://homelens-kappa.vercel.app/",
       "title": "HomeLens",
       "heading": "Decision confidence for the physical world.",
       "textLength": 1168,
@@ -161,7 +161,7 @@
         "width": 768,
         "height": 1024
       },
-      "href": "http://127.0.0.1:3000/",
+      "href": "https://homelens-kappa.vercel.app/",
       "title": "HomeLens",
       "heading": "Decision confidence for the physical world.",
       "textLength": 1243,
@@ -184,7 +184,7 @@
         "width": 1024,
         "height": 768
       },
-      "href": "http://127.0.0.1:3000/",
+      "href": "https://homelens-kappa.vercel.app/",
       "title": "HomeLens",
       "heading": "Decision confidence for the physical world.",
       "textLength": 1243,
@@ -207,7 +207,7 @@
         "width": 1280,
         "height": 800
       },
-      "href": "http://127.0.0.1:3000/",
+      "href": "https://homelens-kappa.vercel.app/",
       "title": "HomeLens",
       "heading": "Decision confidence for the physical world.",
       "textLength": 1243,
@@ -230,7 +230,7 @@
         "width": 1440,
         "height": 900
       },
-      "href": "http://127.0.0.1:3000/",
+      "href": "https://homelens-kappa.vercel.app/",
       "title": "HomeLens",
       "heading": "Decision confidence for the physical world.",
       "textLength": 1243,
@@ -253,7 +253,7 @@
         "width": 320,
         "height": 568
       },
-      "href": "http://127.0.0.1:3000/scan",
+      "href": "https://homelens-kappa.vercel.app/scan",
       "title": "HomeLens",
       "heading": "Capture the room perimeter.",
       "textLength": 692,
@@ -276,7 +276,7 @@
         "width": 375,
         "height": 812
       },
-      "href": "http://127.0.0.1:3000/scan",
+      "href": "https://homelens-kappa.vercel.app/scan",
       "title": "HomeLens",
       "heading": "Capture the room perimeter.",
       "textLength": 692,
@@ -299,7 +299,7 @@
         "width": 430,
         "height": 932
       },
-      "href": "http://127.0.0.1:3000/scan",
+      "href": "https://homelens-kappa.vercel.app/scan",
       "title": "HomeLens",
       "heading": "Capture the room perimeter.",
       "textLength": 692,
@@ -322,7 +322,7 @@
         "width": 768,
         "height": 1024
       },
-      "href": "http://127.0.0.1:3000/scan",
+      "href": "https://homelens-kappa.vercel.app/scan",
       "title": "HomeLens",
       "heading": "Capture the room perimeter.",
       "textLength": 692,
@@ -345,7 +345,7 @@
         "width": 1024,
         "height": 768
       },
-      "href": "http://127.0.0.1:3000/scan",
+      "href": "https://homelens-kappa.vercel.app/scan",
       "title": "HomeLens",
       "heading": "Capture the room perimeter.",
       "textLength": 692,
@@ -368,7 +368,7 @@
         "width": 1280,
         "height": 800
       },
-      "href": "http://127.0.0.1:3000/scan",
+      "href": "https://homelens-kappa.vercel.app/scan",
       "title": "HomeLens",
       "heading": "Capture the room perimeter.",
       "textLength": 692,
@@ -391,7 +391,7 @@
         "width": 1440,
         "height": 900
       },
-      "href": "http://127.0.0.1:3000/scan",
+      "href": "https://homelens-kappa.vercel.app/scan",
       "title": "HomeLens",
       "heading": "Capture the room perimeter.",
       "textLength": 692,
@@ -414,7 +414,7 @@
         "width": 320,
         "height": 568
       },
-      "href": "http://127.0.0.1:3000/analysis",
+      "href": "https://homelens-kappa.vercel.app/analysis",
       "title": "HomeLens",
       "heading": "Living Room",
       "textLength": 2514,
@@ -437,7 +437,7 @@
         "width": 375,
         "height": 812
       },
-      "href": "http://127.0.0.1:3000/analysis",
+      "href": "https://homelens-kappa.vercel.app/analysis",
       "title": "HomeLens",
       "heading": "Living Room",
       "textLength": 2552,
@@ -460,7 +460,7 @@
         "width": 430,
         "height": 932
       },
-      "href": "http://127.0.0.1:3000/analysis",
+      "href": "https://homelens-kappa.vercel.app/analysis",
       "title": "HomeLens",
       "heading": "Living Room",
       "textLength": 2552,
@@ -483,7 +483,7 @@
         "width": 768,
         "height": 1024
       },
-      "href": "http://127.0.0.1:3000/analysis",
+      "href": "https://homelens-kappa.vercel.app/analysis",
       "title": "HomeLens",
       "heading": "Living Room",
       "textLength": 2571,
@@ -506,7 +506,7 @@
         "width": 1024,
         "height": 768
       },
-      "href": "http://127.0.0.1:3000/analysis",
+      "href": "https://homelens-kappa.vercel.app/analysis",
       "title": "HomeLens",
       "heading": "Living Room",
       "textLength": 2571,
@@ -529,7 +529,7 @@
         "width": 1280,
         "height": 800
       },
-      "href": "http://127.0.0.1:3000/analysis",
+      "href": "https://homelens-kappa.vercel.app/analysis",
       "title": "HomeLens",
       "heading": "Living Room",
       "textLength": 2571,
@@ -552,7 +552,7 @@
         "width": 1440,
         "height": 900
       },
-      "href": "http://127.0.0.1:3000/analysis",
+      "href": "https://homelens-kappa.vercel.app/analysis",
       "title": "HomeLens",
       "heading": "Living Room",
       "textLength": 2571,
@@ -574,8 +574,8 @@
     "navigation": {
       "homeLinks": {
         "identity": true,
-        "startHref": "http://127.0.0.1:3000/scan",
-        "sampleHref": "http://127.0.0.1:3000/analysis"
+        "startHref": "https://homelens-kappa.vercel.app/scan",
+        "sampleHref": "https://homelens-kappa.vercel.app/analysis"
       },
       "startNavigation": "/scan",
       "backNavigation": "/",
@@ -589,7 +589,7 @@
     "scanCompletion": {
       "buttonFound": true,
       "doubleCompletionGuard": true,
-      "href": "http://127.0.0.1:3000/analysis",
+      "href": "https://homelens-kappa.vercel.app/analysis",
       "hasAnalysisHeading": true
     },
     "geometrySelection": {

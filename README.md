@@ -8,9 +8,9 @@ Physical-world measurements are imperfect. HomeLens determines which uncertainty
 
 ## Live demo
 
-Public production URL will be added here after Vercel deployment.
+**[https://homelens-kappa.vercel.app](https://homelens-kappa.vercel.app)**
 
-Until then, run locally:
+No account and no secrets required. Capture is simulated.
 
 ```powershell
 npm ci

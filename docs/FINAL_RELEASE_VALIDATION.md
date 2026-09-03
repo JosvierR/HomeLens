@@ -206,4 +206,24 @@ README rewritten for a 90-second hiring-manager read. Three screenshots in `docs
 
 ## Phases 18–22 — CI, git, production
 
-Recorded after push and deploy.
+| Check | Result |
+|---|---|
+| GitHub Actions `npm ci` + test + typecheck + build | PASS — run `33714450390` |
+| Push | `27e8c4f` on `origin/main` |
+| Local HEAD = remote HEAD | yes (`27e8c4f0a1b1fb5e5c6432a7f1f6d77c3f502a33`) before demo-URL follow-up commit |
+| Vercel production | PASS — Nitro `vercel` preset, ready |
+| Production alias | https://homelens-kappa.vercel.app |
+| Production API QA | **41/41 PASS** |
+| Production browser QA | **19/19 PASS** including `/`, `/scan`, `/analysis`, verification, reset, API fallback |
+
+CI annotation: Actions checkout/setup-node still target Node 20 internally; GitHub is forcing Node 24. Upstream runner deprecation, not a project defect.
+
+Vercel warning: `engines.node >=22` may track future majors. Left as `>=22` so local Node 24 continues to install without `EBADENGINE`. CI and the Vercel build used Node 22-compatible Nuxt 4.
+
+## Performance
+
+Largest client assets are Nuxt UI / Vue runtime (~263 kB / 87 kB gzip JS, ~197 kB / 27 kB gzip CSS). No additional bundler complexity was added to chase a Lighthouse score. Direct route refresh on production succeeds. No production console/hydration failures in the browser harness.
+
+## Product honesty
+
+Claims reviewed against the repository. The README, scan UI, calibration panel, and footer disclaimer state that capture is simulated, evidence is synthetic/demo, and the planning index is not Manual J / certified HVAC sizing.
