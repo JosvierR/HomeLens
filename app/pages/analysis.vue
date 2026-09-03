@@ -6,6 +6,7 @@ const { scan, isDemo, verifyMeasurement, resetScan, verificationPending, verific
 if (route.query.demo === '1') resetScan()
 const { analysis, pending, errorMessage, analyze } = useHomeLensAnalysis(scan)
 const { track } = useProductAnalytics()
+const { views: capturedViews } = useScanGallery()
 
 const result = computed(() => analysis.value?.decision ?? null)
 const rescueAction = computed(() => analysis.value?.rescue ?? null)
@@ -244,6 +245,8 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
           @retry="analyze"
         />
 
+        <CapturedViews v-if="capturedViews.length" class="captured-area" :views="capturedViews" />
+
         <div class="evidence-pair">
           <section class="geometry-area" aria-labelledby="geometry-title">
             <div class="geometry-heading">
@@ -293,6 +296,13 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
             @edit-state="handleEditState"
           />
         </section>
+
+        <FitCheckPanel
+          class="fit-area"
+          :scan="scan"
+          :disabled="pending || verificationPending"
+          @verify="startVerification"
+        />
 
         <SensitivitySummary
           class="sensitivity-area"
@@ -469,6 +479,7 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
   font-size: 0.79rem;
 }
 
+.fit-area,
 .sensitivity-area,
 .calibration-area,
 .technical-area {
@@ -523,13 +534,15 @@ onBeforeUnmount(() => clearTimeout(savedTimer))
   }
 
   .recommendation-area { order: 1; }
+  .captured-area { order: 2; }
   .evidence-pair { order: 2; display: contents; }
   .check-area { order: 3; }
   .geometry-area { order: 4; }
   .measurements-area { order: 5; }
-  .sensitivity-area { order: 6; }
-  .calibration-area { order: 7; }
-  .technical-area { order: 8; }
+  .fit-area { order: 6; }
+  .sensitivity-area { order: 7; }
+  .calibration-area { order: 8; }
+  .technical-area { order: 9; }
 }
 
 @media (max-width: 600px) {

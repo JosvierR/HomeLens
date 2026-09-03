@@ -22,6 +22,10 @@ const steps = [
   {
     title: 'Verify only what matters',
     body: 'You only check the one that can move the outcome — then the rest can wait.'
+  },
+  {
+    title: 'Answer "will it fit?"',
+    body: 'Standard furniture is checked against the measured room with its walkway, and the answer is given over the measured range instead of a single number.'
   }
 ]
 </script>

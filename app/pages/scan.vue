@@ -5,7 +5,7 @@ import type { FrameQualityResult } from '~~/shared/frame-quality'
 import type { PhotoEstimationStatusResponse } from '~~/shared/photo-estimation-api'
 import type { FusedPhotoMeasurement } from '~~/shared/photo-metric'
 import type { NextCaptureAction } from '~~/shared/next-best-capture'
-import type { RoomScan } from '~/types/scan'
+import type { Measurement, RoomScan } from '~/types/scan'
 import type { CapturedFrame } from '~/composables/useCamera'
 
 interface CapturedView {
@@ -39,6 +39,7 @@ const { scan, replaceScan } = useDemoScan()
 const { track } = useProductAnalytics()
 const { user, refresh: refreshAuth, ensureGuestSession, configured } = useAuth()
 const { uploadCapture } = useCaptureEvidence()
+const { recordView, clear: clearGallery } = useScanGallery()
 const {
   state: cameraState,
   stream,
@@ -92,6 +93,12 @@ let pollTimer: ReturnType<typeof setTimeout> | undefined
 
 const roomName = ref(scan.value.captureMethod === 'simulated-geometry' ? 'Scanned room' : scan.value.roomName)
 const dimensions = reactive({ width: null as number | null, length: null as number | null, height: null as number | null })
+const manualFields = [
+  { id: 'width', label: 'Width' },
+  { id: 'length', label: 'Length' },
+  { id: 'height', label: 'Ceiling height' }
+] as const
+type ManualFieldId = typeof manualFields[number]['id']
 const openings = reactive({ windows: 0, doors: 0 })
 
 const queryValue = (value: unknown) => typeof value === 'string' && value ? value : null
@@ -264,6 +271,7 @@ const bootstrapGuestScan = async () => {
   if (!configured) return null
   const guest = await ensureGuestSession()
   if (!guest) return null
+  clearGallery()
   const started = await $fetch<{ projectId: string, roomId: string, scanId: string, roomName: string }>('/api/demo/start-scan', {
     method: 'POST'
   })
@@ -306,6 +314,7 @@ const acceptFrame = (frame: CapturedFrame) => {
     nextViews.splice(existingIndex, 1, nextView)
   } else nextViews.push(nextView)
   capturedViews.value = nextViews
+  void recordView(frame)
   capturedFlash.value = true
   microFeedback.value = currentGuidance.value.feedback
   timers.push(setTimeout(() => { capturedFlash.value = false }, 420))
@@ -374,6 +383,7 @@ const retakeAll = () => {
   clearPoll()
   capturedViews.value.forEach(view => URL.revokeObjectURL(view.previewUrl))
   capturedViews.value = []
+  clearGallery()
   estimationStatus.value = null
   estimationAttempts.value = 0
   activeGuidance.value = baseGuidance
@@ -424,11 +434,38 @@ const continueToAnalysis = async () => {
 
 const openManualFallback = () => {
   if (!manualAllowed.value) return
-  dimensions.width = null
-  dimensions.length = null
-  dimensions.height = null
+  // Start from what the photos already support so the tape only has to confirm or correct it.
+  manualFields.forEach(field => {
+    const range = photoRangeFor(field.id)
+    dimensions[field.id] = range ? Math.round(range.valueFeet * 10) / 10 : null
+  })
   mode.value = 'manual'
   submitError.value = null
+}
+
+const manualMeasurement = (field: { id: ManualFieldId, label: string }): Measurement => {
+  const range = photoRangeFor(field.id)
+  return {
+    id: field.id,
+    label: field.label,
+    value: dimensions[field.id]!,
+    unit: 'ft',
+    confidence: 1,
+    rawConfidence: 1,
+    source: 'manual',
+    // The superseded photo estimate stays attached as the audit trail.
+    ...(range ? {
+      originalEstimate: {
+        value: range.valueFeet,
+        confidence: range.confidence,
+        capturedAt: estimationStatus.value?.estimate?.createdAt,
+        uncertaintyLow: range.uncertaintyLowFeet,
+        uncertaintyHigh: range.uncertaintyHighFeet,
+        modelVersion: range.geometryModelVersion,
+        supportingEvidenceIds: range.supportingEvidenceIds
+      }
+    } : {})
+  }
 }
 
 const buildManualScan = (): RoomScan => ({
@@ -442,11 +479,7 @@ const buildManualScan = (): RoomScan => ({
   captureMethod: 'camera-manual-fallback',
   deviceFamily: deviceFamily.value,
   roomCategory: 'room',
-  measurements: [
-    { id: 'width', label: 'Width', value: dimensions.width!, unit: 'ft', confidence: 1, rawConfidence: 1, source: 'manual' },
-    { id: 'length', label: 'Length', value: dimensions.length!, unit: 'ft', confidence: 1, rawConfidence: 1, source: 'manual' },
-    { id: 'height', label: 'Ceiling height', value: dimensions.height!, unit: 'ft', confidence: 1, rawConfidence: 1, source: 'manual' }
-  ]
+  measurements: manualFields.map(manualMeasurement)
 })
 
 const completeManualFallback = async () => {
@@ -480,6 +513,16 @@ const completeManualFallback = async () => {
 const measurementFor = (type: FusedPhotoMeasurement['measurementType']) =>
   estimatedMeasurements.value.find(item => item.measurementType === type)
 const displayFeet = (value: number) => value.toFixed(1)
+
+/** What the photos already support for a dimension, used to guide manual entry. */
+const photoRangeFor = (id: ManualFieldId) => measurementFor(id) ?? null
+
+const manualOutsideRange = (id: ManualFieldId) => {
+  const range = photoRangeFor(id)
+  const value = dimensions[id]
+  if (!range || typeof value !== 'number' || !Number.isFinite(value)) return false
+  return value < range.uncertaintyLowFeet || value > range.uncertaintyHighFeet
+}
 
 const loadProductRoom = async () => {
   const context = productContext.value
@@ -625,14 +668,13 @@ onBeforeUnmount(() => {
         </aside>
       </section>
 
-      <section v-else-if="mode === 'uploading' || mode === 'estimating'" class="processing-panel" aria-live="polite">
-        <div class="spinner" aria-hidden="true" />
-        <p class="eyebrow">{{ mode === 'uploading' ? 'Private upload' : 'Metric geometry' }}</p>
-        <h2>{{ mode === 'uploading' ? 'Securing your accepted views...' : 'Building the room estimate...' }}</h2>
-        <p v-if="mode === 'estimating'">Depth, structural planes, multi-view agreement, and uncertainty are being evaluated. Unsupported dimensions will remain missing.</p>
-        <p v-else>Original images stay private; inference receives time-limited access and does not retain raw depth arrays.</p>
-        <div v-if="estimationStatus" class="job-progress numeric">{{ estimationStatus.progress.completed }} / {{ estimationStatus.progress.total }} views processed</div>
-      </section>
+      <GeometryProgress
+        v-else-if="mode === 'uploading' || mode === 'estimating'"
+        :stage="mode"
+        :completed="estimationStatus?.progress.completed ?? 0"
+        :total="estimationStatus?.progress.total ?? 0"
+        :views="capturedViews.map(view => ({ previewUrl: view.previewUrl, label: view.frame.targetType.replaceAll('_', ' ') }))"
+      />
 
       <section v-else-if="mode === 'results'" class="result-workspace">
         <div class="evidence-summary">
@@ -691,9 +733,23 @@ onBeforeUnmount(() => {
         <form @submit.prevent="completeManualFallback">
           <label class="field field--wide"><span>Room name</span><input v-model.trim="roomName" required maxlength="120"></label>
           <div class="dimension-fields">
-            <label class="field"><span>Width <small>ft</small></span><input v-model.number="dimensions.width" type="number" inputmode="decimal" min="0.1" max="100" step="0.1" required></label>
-            <label class="field"><span>Length <small>ft</small></span><input v-model.number="dimensions.length" type="number" inputmode="decimal" min="0.1" max="100" step="0.1" required></label>
-            <label class="field"><span>Ceiling height <small>ft</small></span><input v-model.number="dimensions.height" type="number" inputmode="decimal" min="0.1" max="100" step="0.1" required></label>
+            <div v-for="field in manualFields" :key="field.id" class="manual-field">
+              <label class="field">
+                <span>{{ field.label }} <small>ft</small></span>
+                <input v-model.number="dimensions[field.id]" type="number" inputmode="decimal" min="0.1" max="100" step="0.1" required>
+              </label>
+              <p v-if="photoRangeFor(field.id)" class="field-hint numeric">
+                Photos: {{ displayFeet(photoRangeFor(field.id)!.valueFeet) }} ft
+                <span aria-hidden="true">·</span>
+                likely {{ displayFeet(photoRangeFor(field.id)!.uncertaintyLowFeet) }}-{{ displayFeet(photoRangeFor(field.id)!.uncertaintyHighFeet) }} ft
+                <span aria-hidden="true">·</span>
+                {{ photoRangeFor(field.id)!.supportingViewCount }} view{{ photoRangeFor(field.id)!.supportingViewCount === 1 ? '' : 's' }}
+              </p>
+              <p v-else class="field-hint">No photo support for this dimension.</p>
+              <p v-if="manualOutsideRange(field.id)" class="field-hint field-hint--warn">
+                Outside the photo range. Your tape measurement wins; the estimate stays in the audit trail.
+              </p>
+            </div>
           </div>
           <div class="opening-fields">
             <label class="field"><span>Windows</span><input v-model.number="openings.windows" type="number" min="0" max="100" step="1"></label>
@@ -719,8 +775,8 @@ onBeforeUnmount(() => {
 .progress-readout { justify-self: end; color: #8a9895; font-size: .8rem; }.scan-content { padding-block: 24px 40px; }
 .eyebrow { margin: 0 0 8px; color: #86b9ae; font-size: .72rem; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
 h2 { margin: 0; font-size: clamp(1.35rem, 3vw, 1.75rem); font-weight: 620; letter-spacing: -.03em; line-height: 1.2; }
-.permission-gate,.processing-panel,.recovery-panel,.manual-panel { max-width: 620px; margin: 48px auto 0; }
-.permission-gate>p,.processing-panel>p,.recovery-panel>p,.manual-panel>p { color: #9aa8a4; line-height: 1.55; }
+.permission-gate,.recovery-panel,.manual-panel { max-width: 620px; margin: 48px auto 0; }
+.permission-gate>p,.recovery-panel>p,.manual-panel>p { color: #9aa8a4; line-height: 1.55; }
 .setup-notice,.next-capture { margin-top: 18px; border-left: 2px solid #78a89e; padding: 10px 12px; background: #17201f; color: #b8c5c1; font-size: .86rem; line-height: 1.5; }.setup-notice a { color: #a9ded2; text-decoration: underline; }
 .gate-status,.gate-error { margin-top: 18px; color: #d9c083; }.gate-actions,.recovery-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }.privacy-note { color: #71807c !important; font-size: .76rem; }
 .capture-workspace,.result-workspace { display: grid; grid-template-columns: minmax(0,1fr) 330px; gap: 1px; overflow: hidden; border: 1px solid #2d3936; border-radius: var(--radius-media); background: #2d3936; }
@@ -729,11 +785,11 @@ h2 { margin: 0; font-size: clamp(1.35rem, 3vw, 1.75rem); font-weight: 620; lette
 .canvas-topbar { position: absolute; z-index: 4; top: 14px; right: 14px; left: 14px; display: flex; justify-content: space-between; pointer-events: none; }.live-label,.camera-switch { border: 1px solid rgb(255 255 255 / 15%); border-radius: 999px; padding: 7px 10px; background: rgb(5 8 7 / 78%); color: #d4dfdc; font-size: .73rem; }.live-label i { display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: #78d0bd; }.camera-switch { cursor: pointer; pointer-events: auto; }
 .frame-guide { position: absolute; inset: 12%; z-index: 2; border: 1px solid rgb(235 249 245 / 42%); border-radius: 3px; pointer-events: none; }.capture-flash { position: absolute; z-index: 6; top: 50%; left: 50%; padding: 9px 15px; border: 1px solid #5a9b8d; border-radius: 8px; background: rgb(15 22 21 / 92%); transform: translate(-50%,-50%); }
 .capture-guidance { display: flex; min-width: 0; flex-direction: column; justify-content: space-between; gap: 24px; padding: 22px 20px 18px; background: #17201f; }.guidance-kicker { margin: 0; color: #7d8a86; font-size: .74rem; }.capture-guidance h2 { margin-top: 8px; font-size: 1.15rem; }.capture-guidance p { color: #9aa8a4; font-size: .86rem; line-height: 1.55; }.micro-feedback { color: #a9ded2 !important; }.view-progress { display: grid; gap: 9px; margin: 24px 0 0; padding: 18px 0 0; border-top: 1px solid #2b3835; list-style: none; }.view-progress li { display: grid; grid-template-columns: 22px 1fr; color: #788682; font-size: .76rem; }.view-progress li.current { color: #fff; }.view-progress li.complete { color: #94c7bc; }.capture-button,.primary-action { width: 100%; min-height: 46px; }
-.processing-panel { text-align: center; }.processing-panel p { max-width: 540px; margin-inline: auto; }.spinner { width: 34px; height: 34px; margin: 0 auto 22px; border: 2px solid #40504c; border-top-color: #9ccfc5; border-radius: 50%; animation: spin .8s linear infinite; }.job-progress { margin-top: 18px; color: #86b9ae; font-size: .8rem; }@keyframes spin { to { transform: rotate(360deg); } }
+.manual-field { display: grid; gap: 5px; min-width: 0; }.field-hint { margin: 0; color: #7f8d89; font-size: .72rem; line-height: 1.45; }.field-hint--warn { color: #e5c991; }
 .result-workspace { grid-template-columns: minmax(0,1.05fr) minmax(390px,.95fr); background: #111817; }.evidence-summary,.estimate-review { min-width: 0; padding: 26px; }.evidence-summary { border-right: 1px solid #2d3936; }.section-heading { display: flex; justify-content: space-between; gap: 18px; }.text-button { min-height: 34px; border: 0; padding: 0; background: transparent; color: #9ccfc5; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .evidence-strip { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 22px; }.evidence-strip figure { min-width: 0; margin: 0; overflow: hidden; border: 1px solid #2d3936; border-radius: 8px; }.evidence-strip img { display: block; width: 100%; aspect-ratio: 4/3; object-fit: cover; }.evidence-strip figcaption { overflow: hidden; padding: 7px; color: #91a09c; font-size: .67rem; text-overflow: ellipsis; white-space: nowrap; }.shape-note,.form-intro { color: #8f9d99; font-size: .8rem; line-height: 1.5; }
 .estimate-review { display: grid; align-content: start; gap: 17px; background: #17201f; }.estimate-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; }.estimate-grid article { display: grid; gap: 3px; padding: 12px; border: 1px solid #34423f; border-radius: 8px; background: #111817; }.estimate-grid article>span:first-child { color: #9ba9a5; font-size: .72rem; }.estimate-grid strong { font-size: 1.25rem; }.estimate-grid small { font-size: .7rem; font-weight: 400; }.range,.support { color: #879590; font-size: .68rem; line-height: 1.35; }.next-capture { display: grid; gap: 6px; margin: 0; }.next-capture .button { margin-top: 4px; }
 .field { display: grid; gap: 6px; color: #b5c1bd; font-size: .75rem; }.field span { display: flex; justify-content: space-between; gap: 6px; }.field small { color: #75837f; }.field input { width: 100%; min-width: 0; min-height: 44px; border: 1px solid #3a4945; border-radius: 8px; padding: 0 11px; background: #101716; color: #f2f6f5; }.opening-fields,.dimension-fields { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; }.dimension-fields { grid-template-columns: repeat(3,1fr); }.manual-panel form { display: grid; gap: 16px; margin-top: 22px; }.submit-error { margin: 0; border-left: 2px solid #d9ae63; padding-left: 10px; color: #e5c991; font-size: .8rem; line-height: 1.5; }.partial-list { display: grid; gap: 5px; color: #a9b6b2; font-size: .85rem; }
 @media (max-width:900px) { .capture-workspace,.result-workspace { grid-template-columns:1fr; }.capture-canvas { height:min(58svh,560px); min-height:340px; }.capture-guidance { min-height:280px; }.evidence-summary { border-right:0; border-bottom:1px solid #2d3936; } }
-@media (max-width:580px) { .scan-shell { width:min(calc(100% - 24px),1180px); }.scan-header-inner { grid-template-columns:auto minmax(0,1fr) auto; gap:9px; }.back-link { font-size:0; }.back-link::first-letter { font-size:1rem; }.scan-content { padding-block:12px 28px; }.permission-gate,.processing-panel,.recovery-panel,.manual-panel { margin-top:28px; }.gate-actions,.recovery-actions { display:grid; }.capture-canvas { height:min(54svh,460px); min-height:300px; }.capture-guidance { min-height:260px; padding:18px 16px calc(16px + env(safe-area-inset-bottom,0px)); }.evidence-summary,.estimate-review { padding:20px 16px; }.evidence-strip { gap:5px; }.estimate-grid,.dimension-fields { grid-template-columns:1fr; }.estimate-grid article { grid-template-columns:1fr auto; }.estimate-grid article strong { grid-row:1/3; grid-column:2; }.opening-fields { grid-template-columns:1fr 1fr; } }
+@media (max-width:580px) { .scan-shell { width:min(calc(100% - 24px),1180px); }.scan-header-inner { grid-template-columns:auto minmax(0,1fr) auto; gap:9px; }.back-link { font-size:0; }.back-link::first-letter { font-size:1rem; }.scan-content { padding-block:12px 28px; }.permission-gate,.recovery-panel,.manual-panel { margin-top:28px; }.gate-actions,.recovery-actions { display:grid; }.capture-canvas { height:min(54svh,460px); min-height:300px; }.capture-guidance { min-height:260px; padding:18px 16px calc(16px + env(safe-area-inset-bottom,0px)); }.evidence-summary,.estimate-review { padding:20px 16px; }.evidence-strip { gap:5px; }.estimate-grid,.dimension-fields { grid-template-columns:1fr; }.estimate-grid article { grid-template-columns:1fr auto; }.estimate-grid article strong { grid-row:1/3; grid-column:2; }.opening-fields { grid-template-columns:1fr 1fr; } }
 </style>

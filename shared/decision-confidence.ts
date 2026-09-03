@@ -183,6 +183,12 @@ const uncertaintyBounds = (measurement: DecisionMeasurement, confidence: number)
   return { low: measurement.value * (1 - spread), high: measurement.value * (1 + spread) }
 }
 
+/** The interval a measurement is expected to fall within, using its own confidence. */
+export const measurementUncertaintyBounds = (measurement: DecisionMeasurement) =>
+  measurement.source === 'manual'
+    ? { low: measurement.value, high: measurement.value }
+    : uncertaintyBounds(measurement, measurement.confidence)
+
 const deterministicNoise = (sample: number, salt: number) => {
   const x = Math.sin((sample + 1) * (12.9898 + salt * 17.17)) * 43758.5453
   return (x - Math.floor(x)) * 2 - 1
