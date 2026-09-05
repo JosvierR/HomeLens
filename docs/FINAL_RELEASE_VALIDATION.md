@@ -1,10 +1,12 @@
 # Final Release Validation
 
+> Historical release-gate notes from 2026-09-03. Current production is `main` at [https://homelens-kappa.vercel.app](https://homelens-kappa.vercel.app). Prefer CI on `main` and the README over the commit SHAs recorded here.
+
 Release gate date: 2026-09-03  
 Workspace: `C:\Users\josvi\OneDrive\Desktop\HomeLens`  
 Role: prove the existing worktree is safe, reproducible, committed, pushed, deployable, and publicly inspectable.
 
-This document is the live record of the final release gate. It does not replace `docs/FUNCTIONAL_VALIDATION.md`.
+This document is a snapshot of that gate. It does not replace `docs/FUNCTIONAL_VALIDATION.md`.
 
 ## Phase 1 — Worktree inventory
 

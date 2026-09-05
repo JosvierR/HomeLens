@@ -1,5 +1,7 @@
 # Final Photo-to-Metric release inventory
 
+> Historical snapshot from 2026-09-03, taken **before** the photo-metric worker and later polish landed on `main`. Do not treat the “pending migration” or “GPU not deployed” notes as current production state. See the README for the live product.
+
 Recorded before finishing remaining production wiring. No files were reset or discarded.
 
 ## Git

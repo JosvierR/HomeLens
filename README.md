@@ -10,7 +10,15 @@ HomeLens estimates room dimensions from multiple visual observations, quantifies
 
 **[https://homelens-kappa.vercel.app](https://homelens-kappa.vercel.app)**
 
-Public **Try demo** needs no account and stays synthetic. **Scan a room** uses the real camera, private Storage, and GPU photo-to-metric inference when the worker is configured.
+Public **Try demo** needs no account and stays synthetic. **Scan a room** uses the real camera, private Storage, and GPU photo-to-metric inference when the Modal worker has credit and is configured.
+
+## For reviewers
+
+- Production is this `main` branch on Vercel. CI (`test`, `typecheck`, `build`) is required on every push.
+- 60–90s product story: open [`/analysis?demo=1`](https://homelens-kappa.vercel.app/analysis?demo=1). That room is labeled **Demo** and is synthetic.
+- Recording notes: [docs/ZERO_DEMO_SCRIPT.md](docs/ZERO_DEMO_SCRIPT.md)
+- Fit-check assumptions: [docs/FIT_CHECK.md](docs/FIT_CHECK.md)
+- Photo estimation from a real room needs a funded Modal GPU worker. If credits are exhausted, the camera still captures and stores private evidence; use physical measurements or the labeled demo for the decision story.
 
 ## Loop
 
@@ -101,10 +109,14 @@ Database/RLS tests require a running local Supabase (`npx supabase test db`).
 
 ## Docs
 
+- [Zero Homes demo script](docs/ZERO_DEMO_SCRIPT.md)
+- [Fit Check](docs/FIT_CHECK.md)
+- [Decision engine](docs/DECISION_ENGINE.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Database](docs/DATABASE.md)
 - [Learning system](docs/LEARNING_SYSTEM.md)
 - [Privacy](docs/PRIVACY_ARCHITECTURE.md)
+- [Security](SECURITY.md)
 - [Moat hypothesis](docs/MOAT.md)
 - [Model licenses](docs/MODEL_LICENSES.md)
 - [Benchmark report](docs/BENCHMARK_REPORT.md)
