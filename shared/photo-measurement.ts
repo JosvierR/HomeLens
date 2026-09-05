@@ -1,3 +1,4 @@
+import { fuseUncertainty } from './measurement-uncertainty'
 import {
   DEPTH_MODEL_VERSION,
   GEOMETRY_MODEL_VERSION,
@@ -61,25 +62,22 @@ export const fuseMeasurementObservations = (
   const weightTotal = weights.reduce((total, value) => total + value, 0)
   const valueFeet = candidates.reduce((total, item, index) => total + item.estimatedValueFeet * weights[index]!, 0) / weightTotal
   const consistency = calculateMultiViewConsistency(observations)
-  const viewSupport = clamp(observations.length / 3)
   const rawGeometryConfidence = mean(candidates.map(item => weightedGeometricMean(item.signals)))
-  const observationConfidence = mean(candidates.map(item => item.confidence))
-  const confidence = clamp(rawGeometryConfidence * 0.45 + observationConfidence * 0.25 + consistency * 0.2 + viewSupport * 0.1)
-
-  const withinViewUncertainty = mean(candidates.map(item =>
-    Math.max(item.estimatedValueFeet - item.uncertaintyLowFeet, item.uncertaintyHighFeet - item.estimatedValueFeet)
-  ))
-  const betweenViewStdDev = Math.sqrt(mean(candidates.map(item => (item.estimatedValueFeet - valueFeet) ** 2)))
-  const confidencePenalty = valueFeet * (1 - confidence) * 0.08
-  const halfRange = Math.max(0.08, withinViewUncertainty, betweenViewStdDev * 1.645, confidencePenalty)
+  const fused = fuseUncertainty({
+    valueFeet,
+    observationValues: candidates.map(item => item.estimatedValueFeet),
+    observationHalfWidths: candidates.map(item =>
+      Math.max(item.estimatedValueFeet - item.uncertaintyLowFeet, item.uncertaintyHighFeet - item.estimatedValueFeet)
+    )
+  })
 
   return {
     measurementType: type,
     label: LABELS[type],
     valueFeet,
-    confidence,
-    uncertaintyLowFeet: Math.max(0.1, valueFeet - halfRange),
-    uncertaintyHighFeet: Math.min(100, valueFeet + halfRange),
+    confidence: fused.confidence,
+    uncertaintyLowFeet: fused.uncertaintyLowFeet,
+    uncertaintyHighFeet: fused.uncertaintyHighFeet,
     supportingEvidenceIds: [...new Set(candidates.map(item => item.evidenceId))],
     supportingViewCount: new Set(candidates.map(item => item.evidenceId)).size,
     multiViewConsistency: consistency,

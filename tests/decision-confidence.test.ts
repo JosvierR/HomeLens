@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { calculateDecisionConfidence, roomScanSchema, type DecisionRoomScan } from '../shared/decision-confidence'
+import { boundsFromConfidence } from '../shared/measurement-uncertainty'
 
 const scan: DecisionRoomScan = {
   id: 'test-room', roomName: 'Living Room', createdAt: '2026-09-02T00:00:00.000Z', windows: 3, doors: 0,
@@ -106,5 +107,15 @@ describe('calculateDecisionConfidence', () => {
       measurement.uncertaintyHigh = measurement.value
     })
     expect(calculateDecisionConfidence(candidate).bandStability).toBe(1)
+  })
+
+  it('treats a missing interval as the mapped confidence interval', () => {
+    const explicit = cloneScan()
+    explicit.measurements.forEach(measurement => {
+      const bounds = boundsFromConfidence(measurement.value, measurement.confidence)
+      measurement.uncertaintyLow = bounds.low
+      measurement.uncertaintyHigh = bounds.high
+    })
+    expect(calculateDecisionConfidence(explicit)).toEqual(calculateDecisionConfidence(scan))
   })
 })

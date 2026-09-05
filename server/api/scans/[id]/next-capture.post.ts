@@ -57,7 +57,7 @@ export default defineEventHandler(async (event) => {
         label: item.label,
         value: item.accepted_value,
         unit: 'ft',
-        confidence: item.calibrated_confidence ?? item.raw_confidence,
+        confidence: item.source === 'manual' ? 1 : (item.calibrated_confidence ?? item.raw_confidence),
         source: item.source,
         rawConfidence: item.raw_confidence,
         calibratedConfidence: item.calibrated_confidence ?? undefined,

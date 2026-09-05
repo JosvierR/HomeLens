@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { boundsFromConfidence } from './measurement-uncertainty'
 import { PHOTO_MEASUREMENT_MODEL_VERSION } from './photo-metric'
 
 export const MAX_MEASUREMENT_VALUE_FEET = 100
@@ -173,14 +174,11 @@ const bandFor = (value: number): RecommendationBand => {
   return 'high-capacity'
 }
 
-const uncertaintyFraction = (confidence: number) => (1 - confidence) * 0.29
-
 const uncertaintyBounds = (measurement: DecisionMeasurement, confidence: number) => {
   if (measurement.uncertaintyLow !== undefined && measurement.uncertaintyHigh !== undefined) {
     return { low: measurement.uncertaintyLow, high: measurement.uncertaintyHigh }
   }
-  const spread = uncertaintyFraction(confidence)
-  return { low: measurement.value * (1 - spread), high: measurement.value * (1 + spread) }
+  return boundsFromConfidence(measurement.value, confidence)
 }
 
 /** The interval a measurement is expected to fall within, using its own confidence. */

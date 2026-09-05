@@ -53,6 +53,8 @@ class PayloadContractTests(unittest.TestCase):
         source = Path(__file__).with_name("app.py").read_text(encoding="utf8")
         self.assertNotIn("12.5", source)
         self.assertIn("insufficient", source)
+        self.assertIn("MAX_RELATIVE_HALF_WIDTH", source)
+        self.assertIn("1.0 - relative_range / MAX_RELATIVE_HALF_WIDTH", source)
 
 
 if __name__ == "__main__":

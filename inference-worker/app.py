@@ -160,21 +160,36 @@ def plane_payload(evidence_id: str, kind: str, plane):
     }
 
 
-def bounded_observation(evidence: EvidenceInput, kind: str, meters: float, fit, depth_quality: float,
-                        structure_quality: float, completeness: float):
-    if not math.isfinite(meters) or not 1.4 <= meters <= 30.0 or fit is None:
+# Keep in lockstep with shared/measurement-uncertainty.ts
+MAX_RELATIVE_HALF_WIDTH = 0.29
+MIN_RELATIVE_RANGE = 0.035
+MAX_RELATIVE_RANGE = 0.28
+
+
+def bounded_observation(evidence: EvidenceInput, kind: str, meters: float, residual_meters: float,
+                        depth_quality: float, structure_quality: float, completeness: float,
+                        extra_relative: float = 0.0):
+    """Confidence is the inverse of the 90% relative half-width. No separate score."""
+    if not math.isfinite(meters) or not 1.4 <= meters <= 30.0:
         return None
-    residual = fit[3]
+    if not math.isfinite(residual_meters) or residual_meters < 0:
+        return None
+    residual = residual_meters
     fit_quality = max(0.0, 1.0 - residual / 0.12)
     image_quality = min(1.0, (evidence.metadata.brightnessScore + evidence.metadata.sharpnessScore + evidence.metadata.contrastScore) / 3)
-    confidence = max(0.0, min(1.0,
-        depth_quality * 0.25 + structure_quality * 0.2 + fit_quality * 0.2
-        + image_quality * 0.1 + completeness * 0.15 + 0.1
-    ))
+    relative_residual = residual / max(meters, 0.1)
+    relative_quality = (
+        (1.0 - depth_quality) * 0.10
+        + (1.0 - structure_quality) * 0.06
+        + (1.0 - image_quality) * 0.06
+        + (1.0 - completeness) * 0.06
+        + max(0.0, extra_relative)
+    )
+    relative_range = min(MAX_RELATIVE_RANGE, max(MIN_RELATIVE_RANGE, relative_residual * 1.8 + relative_quality))
+    confidence = max(0.0, min(1.0, 1.0 - relative_range / MAX_RELATIVE_HALF_WIDTH))
     if confidence < 0.34:
         return None
     feet = meters * 3.280839895
-    relative_range = max(0.035, min(0.28, (1 - confidence) * 0.32 + residual / max(meters, 0.1)))
     return {
         "evidenceId": evidence.evidenceId,
         "measurementType": kind,
@@ -239,16 +254,27 @@ def infer_view(evidence: EvidenceInput):
     horizontal_alignment = abs(float(np.dot(fits["floor"][0], fits["ceiling"][0]))) if fits["floor"] and fits["ceiling"] else 0
     rectangularity = max(0.0, min(1.0, (wall_alignment + horizontal_alignment) / 2 * structure_quality))
 
-    observations = []
     height_m = parallel_distance(fits["floor"], fits["ceiling"])
     width_m = parallel_distance(fits["left_wall"], fits["right_wall"])
     floor_points = back_project(depth, focal, masks["floor"])
-    length_m = float(np.percentile(floor_points[:, 2], 95) - min(0.35, np.percentile(floor_points[:, 2], 5))) if len(floor_points) else float("nan")
+    floor_residual = fits["floor"][3] if fits["floor"] else float("nan")
+    left_residual = fits["left_wall"][3] if fits["left_wall"] else float("nan")
+    length_m = float("nan")
+    length_residual = floor_residual if math.isfinite(floor_residual) else 0.08
+    length_extra = 0.0
+    if len(floor_points) >= 20:
+        zs = floor_points[:, 2]
+        far = float(np.percentile(zs, 95))
+        near = min(0.35, float(np.percentile(zs, 5)))
+        length_m = far - near
+        far_band = max(0.0, float(np.percentile(zs, 98) - np.percentile(zs, 90)))
+        length_extra = far_band / max(length_m, 0.1)
     completeness = min(1.0, len(plane_results) / 4)
+    observations = []
     for candidate in (
-        bounded_observation(evidence, "height", height_m or float("nan"), fits["floor"], depth_quality, structure_quality, completeness),
-        bounded_observation(evidence, "width", width_m or float("nan"), fits["left_wall"], depth_quality, structure_quality, completeness),
-        bounded_observation(evidence, "length", length_m, fits["back_wall"], depth_quality, structure_quality, completeness),
+        bounded_observation(evidence, "height", height_m or float("nan"), floor_residual, depth_quality, structure_quality, completeness),
+        bounded_observation(evidence, "width", width_m or float("nan"), left_residual, depth_quality, structure_quality, completeness),
+        bounded_observation(evidence, "length", length_m, length_residual, depth_quality, structure_quality, completeness, length_extra),
     ):
         if candidate is not None:
             observations.append(candidate)

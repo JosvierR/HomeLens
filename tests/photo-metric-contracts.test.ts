@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { inferPhotoEstimationState } from '../shared/photo-estimation-api'
-import { metricDepthResultSchema, photoMetricCallbackSchema } from '../shared/photo-metric'
+import { captureMetadataFromEvidenceRow, metricDepthResultSchema, photoMetricCallbackSchema } from '../shared/photo-metric'
 
 describe('photo metric contracts', () => {
   it('accepts scalar depth metadata while keeping the depth array out of JSON', () => {
@@ -54,6 +54,31 @@ describe('photo metric contracts', () => {
       status: 'failed',
       completedAt: '2026-09-03T12:00:00.000Z'
     })).toThrow()
+  })
+})
+
+describe('capture metadata for inference', () => {
+  it('coerces persisted rows so a missing timezone cannot 500 the start route', () => {
+    const metadata = captureMetadataFromEvidenceRow({
+      id: 'evidence-1',
+      capture_id: 'cap-1',
+      captured_at: '2026-09-03T19:50:34.000+00:00',
+      width_px: 390,
+      height_px: 844,
+      orientation: null,
+      device_family: 'ios-mobile',
+      camera_id_hash: 'abc',
+      facing_mode: 'environment',
+      target_type: 'overview',
+      brightness_score: null,
+      sharpness_score: 0.8,
+      contrast_score: 0.7,
+      quality_bucket: null
+    })
+    expect(metadata.orientation).toBe('portrait')
+    expect(metadata.qualityBucket).toBe('usable')
+    expect(metadata.cameraIdHash).toBeUndefined()
+    expect(metadata.brightnessScore).toBe(0.5)
   })
 })
 

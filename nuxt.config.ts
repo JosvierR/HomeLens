@@ -7,6 +7,13 @@ export default defineNuxtConfig({
   devtools: { enabled: false },
   modules: ['@nuxt/ui'],
   css: ['~/assets/css/main.css'],
+  nitro: {
+    vercel: {
+      functions: {
+        maxDuration: 60
+      }
+    }
+  },
   devServer: {
     host: '127.0.0.1',
     port: 3000

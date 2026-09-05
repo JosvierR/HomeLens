@@ -1,11 +1,9 @@
 import type { DecisionMeasurement, DecisionRoomScan } from './decision-confidence'
 import { measurementUncertaintyBounds } from './decision-confidence'
 import { formatFeet, formatPercent } from './format'
+import { NINETY_PERCENT_Z } from './measurement-uncertainty'
 
 export const FIT_CHECK_MODEL_VERSION = 'fit-check-v1' as const
-
-/** Half-width of a 90% interval expressed in standard deviations. */
-const NINETY_PERCENT_Z = 1.6448536269514722
 const FITS_THRESHOLD = 0.9
 const UNCERTAIN_THRESHOLD = 0.5
 const IMPACT_EPSILON = 1e-6

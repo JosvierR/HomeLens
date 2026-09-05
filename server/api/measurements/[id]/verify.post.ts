@@ -33,8 +33,8 @@ const toDecisionScan = (
     source: item.source,
     rawConfidence: item.raw_confidence,
     calibratedConfidence: item.calibrated_confidence ?? undefined,
-    uncertaintyLow: item.uncertainty_low ?? undefined,
-    uncertaintyHigh: item.uncertainty_high ?? undefined,
+    uncertaintyLow: item.source === 'manual' ? undefined : item.uncertainty_low ?? undefined,
+    uncertaintyHigh: item.source === 'manual' ? undefined : item.uncertainty_high ?? undefined,
     provenance: item.measurement_method ? {
       measurementMethod: item.measurement_method,
       depthModelVersion: item.depth_model_version ?? undefined,

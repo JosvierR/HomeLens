@@ -64,6 +64,8 @@ export const applyManualVerification = (
   measurement.source = 'manual'
   measurement.confidence = 1
   measurement.calibratedConfidence = undefined
+  measurement.uncertaintyLow = undefined
+  measurement.uncertaintyHigh = undefined
   measurement.verification = {
     verifiedAt,
     verificationSource: 'manual',

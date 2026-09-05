@@ -1,10 +1,26 @@
+import { ZodError } from 'zod'
 import { REQUIRED_CAPTURE_TARGETS } from '~~/shared/capture-analysis'
-import { safeCaptureMetadataSchema } from '~~/shared/photo-metric'
+import { captureMetadataFromEvidenceRow } from '~~/shared/photo-metric'
 import { MODEL_VERSIONS } from '~~/shared/model-versions'
 import { ApiContractError, apiFailure } from '../../../../utils/api-contract'
 import { getRequestId, logServerEvent } from '../../../../utils/observability'
 import { requireUser } from '../../../../utils/require-user'
 import { getRoomMeasurementProvider } from '../../../../services/photo-metric-provider'
+
+const ACTIVE_RUN_STATUSES = new Set(['processing', 'succeeded', 'partial', 'insufficient'])
+
+const workerUnavailable = (error: unknown) => {
+  const name = error instanceof Error ? error.name : ''
+  const message = error instanceof Error ? error.message : ''
+  const starting = name === 'AbortError' || /aborted|timeout|Timeout/i.test(message)
+  return new ApiContractError(
+    503,
+    'SERVICE_UNAVAILABLE',
+    starting
+      ? 'The GPU worker is still starting. Wait a few seconds and tap Retry.'
+      : 'The photo estimator could not accept this job. Wait a moment and retry.'
+  )
+}
 
 export default defineEventHandler(async event => {
   const started = Date.now()
@@ -27,9 +43,19 @@ export default defineEventHandler(async event => {
       .maybeSingle()
     if (scanError) throw scanError
     if (!scan) throw new ApiContractError(404, 'NOT_FOUND', 'Scan not found.')
+
     if (scan.status === 'processing_geometry' && scan.inference_job_id) {
-      setResponseStatus(event, 202)
-      return { state: scan.status, jobId: scan.inference_job_id, requestId: getRequestId(event) }
+      const { data: existingRuns } = await supabase
+        .from('image_inference_runs')
+        .select('status')
+        .eq('provider_job_id', scan.inference_job_id)
+        .eq('user_id', user.id)
+      const accepted = (existingRuns ?? []).some(run => ACTIVE_RUN_STATUSES.has(run.status))
+      if (accepted) {
+        setResponseStatus(event, 202)
+        return { state: scan.status, jobId: scan.inference_job_id, requestId: getRequestId(event) }
+      }
+      // Queued-only means the previous submit never reached the worker. Fall through and send a new job.
     }
 
     const { data: evidenceRows, error: evidenceError } = await supabase
@@ -50,30 +76,24 @@ export default defineEventHandler(async event => {
     if (required.length !== REQUIRED_CAPTURE_TARGETS.length) {
       throw new ApiContractError(422, 'UNPROCESSABLE', 'The overview, opposite-corner, and floor/ceiling views must all be uploaded before estimation.')
     }
-    // Include accepted follow-up views so the next-best-capture loop can add evidence.
     const selected = [...latestByTarget.values()].slice(0, 8)
 
     const signedEvidence = await Promise.all(selected.map(async row => {
       const { data, error } = await supabase.storage.from('scan-evidence').createSignedUrl(row!.storage_path, 300)
-      if (error || !data?.signedUrl) throw error ?? new Error('Could not create a private inference URL.')
-      const metadata = safeCaptureMetadataSchema.parse({
-        captureId: row!.capture_id ?? row!.id,
-        capturedAt: row!.captured_at,
-        widthPx: row!.width_px,
-        heightPx: row!.height_px,
-        orientation: row!.orientation ?? (row!.width_px > row!.height_px ? 'landscape' : 'portrait'),
-        deviceFamily: row!.device_family ?? 'web-camera',
-        cameraIdHash: row!.camera_id_hash ?? undefined,
-        facingMode: row!.facing_mode ?? undefined,
-        focalLength35mm: row!.focal_length_35mm ?? undefined,
-        estimatedFocalLengthPx: row!.estimated_focal_length_px ?? undefined,
-        captureTarget: row!.target_type,
-        brightnessScore: row!.brightness_score ?? 0.5,
-        sharpnessScore: row!.sharpness_score ?? 0.5,
-        contrastScore: row!.contrast_score ?? 0.5,
-        qualityBucket: row!.quality_bucket ?? 'usable'
-      })
-      return { evidenceId: row!.id, signedImageUrl: data.signedUrl, metadata }
+      if (error || !data?.signedUrl) {
+        throw new ApiContractError(503, 'SERVICE_UNAVAILABLE', 'Private photo URLs could not be created for inference.')
+      }
+      try {
+        return { evidenceId: row!.id, signedImageUrl: data.signedUrl, metadata: captureMetadataFromEvidenceRow(row!) }
+      } catch (error) {
+        if (error instanceof ZodError) {
+          throw new ApiContractError(422, 'UNPROCESSABLE', 'Capture metadata could not be used for inference.', error.issues.map(issue => ({
+            path: issue.path.join('.'),
+            message: issue.message
+          })))
+        }
+        throw error
+      }
     }))
 
     const jobId = crypto.randomUUID()
@@ -97,15 +117,6 @@ export default defineEventHandler(async event => {
     })))
     if (runError) throw runError
 
-    const { error: stateError } = await supabase.from('scans').update({
-      status: 'processing_geometry',
-      inference_job_id: jobId,
-      inference_error_code: null,
-      inference_error_message: null,
-      measurement_model_version: MODEL_VERSIONS.measurement
-    }).eq('id', scanId).eq('user_id', user.id)
-    if (stateError) throw stateError
-
     try {
       await provider.submit({ jobId, scanId, callbackUrl, evidence: signedEvidence })
     } catch (error) {
@@ -122,14 +133,34 @@ export default defineEventHandler(async event => {
           inference_error_message: 'The inference worker did not accept the job.'
         }).eq('id', scanId).eq('user_id', user.id)
       ])
-      throw error
+      throw workerUnavailable(error)
     }
+
+    const { error: stateError } = await supabase.from('scans').update({
+      status: 'processing_geometry',
+      inference_job_id: jobId,
+      inference_error_code: null,
+      inference_error_message: null,
+      measurement_model_version: MODEL_VERSIONS.measurement
+    }).eq('id', scanId).eq('user_id', user.id)
+    if (stateError) throw stateError
+
+    await supabase.from('image_inference_runs').update({ status: 'processing' })
+      .eq('provider_job_id', jobId)
+      .eq('user_id', user.id)
 
     setResponseStatus(event, 202)
     logServerEvent(event, { operation: 'photo-estimation.start', success: true, duration: Date.now() - started, scanId })
     return { state: 'processing_geometry', jobId, requestId: getRequestId(event) }
   } catch (error) {
-    logServerEvent(event, { operation: 'photo-estimation.start', success: false, duration: Date.now() - started, scanId })
+    logServerEvent(event, {
+      operation: 'photo-estimation.start',
+      success: false,
+      duration: Date.now() - started,
+      scanId,
+      errorName: error instanceof Error ? error.name : 'unknown',
+      errorMessage: error instanceof Error ? error.message.slice(0, 200) : 'unknown'
+    })
     return apiFailure(event, error)
   }
 })

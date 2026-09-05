@@ -7,7 +7,7 @@ const scan: DecisionRoomScan = {
   measurements: [
     { id: 'width', label: 'Width', value: 14, unit: 'ft', confidence: 0.9, source: 'estimated' },
     { id: 'length', label: 'Length', value: 18, unit: 'ft', confidence: 0.8, source: 'estimated' },
-    { id: 'height', label: 'Height', value: 9.1, unit: 'ft', confidence: 0.71, source: 'estimated' }
+    { id: 'height', label: 'Height', value: 9.1, unit: 'ft', confidence: 0.71, source: 'estimated', uncertaintyLow: 8.6, uncertaintyHigh: 9.6 }
   ]
 }
 
@@ -20,9 +20,11 @@ describe('manual verification provenance', () => {
       confidence: 1,
       source: 'manual',
       rawConfidence: 0.71,
-      originalEstimate: { value: 9.1, confidence: 0.71 },
+      originalEstimate: { value: 9.1, confidence: 0.71, uncertaintyLow: 8.6, uncertaintyHigh: 9.6 },
       verification: { verificationSource: 'manual', previousValue: 9.1, previousConfidence: 0.71 }
     })
+    expect(height.uncertaintyLow).toBeUndefined()
+    expect(height.uncertaintyHigh).toBeUndefined()
     expect(scan.measurements.find(item => item.id === 'height')?.value).toBe(9.1)
   })
 

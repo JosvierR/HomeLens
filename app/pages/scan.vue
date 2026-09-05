@@ -152,8 +152,16 @@ const deviceFamily = computed(() => {
 const errorText = (error: unknown, fallback: string) => {
   if (error && typeof error === 'object') {
     const data = 'data' in error ? error.data : undefined
-    if (data && typeof data === 'object' && 'message' in data && typeof data.message === 'string') return data.message
-    if ('message' in error && typeof error.message === 'string') return error.message
+    if (data && typeof data === 'object') {
+      const nested = 'error' in data ? data.error : undefined
+      if (nested && typeof nested === 'object' && 'message' in nested && typeof nested.message === 'string') {
+        return nested.message
+      }
+      if ('message' in data && typeof data.message === 'string') return data.message
+    }
+    if ('message' in error && typeof error.message === 'string' && !/^\[[A-Z]+\] "/.test(error.message)) {
+      return error.message
+    }
   }
   return fallback
 }

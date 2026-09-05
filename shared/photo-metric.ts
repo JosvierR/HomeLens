@@ -5,7 +5,7 @@ export const PHOTO_MEASUREMENT_MODEL_VERSION = 'photo-geometry-v1' as const
 export const DEPTH_MODEL_VERSION = 'depth-pro-0.1-9efe5c1' as const
 export const STRUCTURE_MODEL_VERSION = 'depth-structure-heuristic-v1' as const
 export const GEOMETRY_MODEL_VERSION = 'ransac-room-geometry-v1' as const
-export const MEASUREMENT_CONFIDENCE_VERSION = 'photo-confidence-v1' as const
+export const MEASUREMENT_CONFIDENCE_VERSION = 'photo-confidence-v2' as const
 
 const scoreSchema = z.number().finite().min(0).max(1)
 const positiveMetricSchema = z.number().finite().positive().max(100)
@@ -33,6 +33,64 @@ export const safeCaptureMetadataSchema = z.object({
   contrastScore: scoreSchema,
   qualityBucket: z.enum(['good', 'usable', 'recapture_recommended'])
 }).strict()
+
+const hasTimezone = (value: string) => /Z$|[+-]\d{2}:\d{2}$/.test(value)
+
+/** Coerce a persisted capture row into worker metadata. Never throw a raw Zod error to the client. */
+export const captureMetadataFromEvidenceRow = (row: {
+  id: string
+  capture_id?: string | null
+  captured_at: string
+  width_px: number | string
+  height_px: number | string
+  orientation?: string | null
+  device_family?: string | null
+  camera_id_hash?: string | null
+  facing_mode?: string | null
+  focal_length_35mm?: number | string | null
+  estimated_focal_length_px?: number | string | null
+  target_type: string
+  brightness_score?: number | string | null
+  sharpness_score?: number | string | null
+  contrast_score?: number | string | null
+  quality_bucket?: string | null
+}) => {
+  const capturedAt = hasTimezone(row.captured_at) ? row.captured_at : new Date(row.captured_at).toISOString()
+  const widthPx = Math.round(Number(row.width_px))
+  const heightPx = Math.round(Number(row.height_px))
+  const cameraIdHash = row.camera_id_hash && row.camera_id_hash.length >= 8 ? row.camera_id_hash : undefined
+  const optionalPositive = (value: number | string | null | undefined) => {
+    if (value == null || value === '') return undefined
+    const number = Number(value)
+    return Number.isFinite(number) && number > 0 ? number : undefined
+  }
+  const optionalScore = (value: number | string | null | undefined, fallback: number) => {
+    if (value == null || value === '') return fallback
+    const number = Number(value)
+    return Number.isFinite(number) ? Math.min(1, Math.max(0, number)) : fallback
+  }
+  return safeCaptureMetadataSchema.parse({
+    captureId: row.capture_id || row.id,
+    capturedAt,
+    widthPx,
+    heightPx,
+    orientation: row.orientation === 'portrait' || row.orientation === 'landscape' || row.orientation === 'square'
+      ? row.orientation
+      : widthPx > heightPx ? 'landscape' : 'portrait',
+    deviceFamily: row.device_family || 'web-camera',
+    cameraIdHash,
+    facingMode: row.facing_mode || undefined,
+    focalLength35mm: optionalPositive(row.focal_length_35mm),
+    estimatedFocalLengthPx: optionalPositive(row.estimated_focal_length_px),
+    captureTarget: row.target_type,
+    brightnessScore: optionalScore(row.brightness_score, 0.5),
+    sharpnessScore: optionalScore(row.sharpness_score, 0.5),
+    contrastScore: optionalScore(row.contrast_score, 0.5),
+    qualityBucket: row.quality_bucket === 'good' || row.quality_bucket === 'usable' || row.quality_bucket === 'recapture_recommended'
+      ? row.quality_bucket
+      : 'usable'
+  })
+}
 
 export const metricDepthResultSchema = z.object({
   evidenceId: z.string().trim().min(1).max(120),

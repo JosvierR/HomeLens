@@ -44,7 +44,8 @@ export class RemotePhotoMetricMeasurementProvider implements RoomMeasurementProv
 
   async submit(request: PhotoMetricJobRequest) {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 15000)
+    // Modal GPU cold start can exceed 15s. Stay under the Vercel function budget of 60s.
+    const timeout = setTimeout(() => controller.abort(), 45000)
     try {
       const response = await fetch(`${this.endpoint.replace(/\/$/, '')}/v1/jobs`, {
         method: 'POST',

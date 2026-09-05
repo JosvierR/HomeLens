@@ -35,6 +35,8 @@ describe('multi-view photo measurement', () => {
     expect(fused!.multiViewConsistency).toBeGreaterThan(0.9)
     expect(fused!.uncertaintyLowFeet).toBeLessThan(fused!.valueFeet)
     expect(fused!.uncertaintyHighFeet).toBeGreaterThan(fused!.valueFeet)
+    const half = Math.max(fused!.valueFeet - fused!.uncertaintyLowFeet, fused!.uncertaintyHighFeet - fused!.valueFeet)
+    expect(fused!.confidence).toBeCloseTo(1 - (half / fused!.valueFeet) / 0.29, 5)
   })
 
   it('rejects an outlier view instead of averaging it into the fused estimate', () => {
@@ -56,6 +58,16 @@ describe('multi-view photo measurement', () => {
       observation('a', 'length', 14.1), observation('b', 'length', 16.8), observation('c', 'length', 15.2)
     ])
     expect(inconsistent).toBeLessThan(consistent)
+
+    const tight = fuseMeasurementObservations([
+      observation('a', 'length', 15.7), observation('b', 'length', 15.8), observation('c', 'length', 15.9)
+    ])
+    const loose = fuseMeasurementObservations([
+      observation('a', 'length', 14.1), observation('b', 'length', 16.8), observation('c', 'length', 15.2)
+    ])
+    expect(loose!.confidence).toBeLessThan(tight!.confidence)
+    expect(loose!.uncertaintyHighFeet - loose!.uncertaintyLowFeet)
+      .toBeGreaterThan(tight!.uncertaintyHighFeet - tight!.uncertaintyLowFeet)
   })
 
   it('returns partial or irregular instead of inventing missing dimensions', () => {
