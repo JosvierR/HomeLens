@@ -44,6 +44,7 @@ Photo estimation
 - Zod contracts + deterministic decision engines in `shared/`
 - Supabase Auth, Postgres RLS, private Storage
 - GPU inference worker (`inference-worker/`) with Apple Depth Pro
+- Vercel Web Analytics and Speed Insights (pageviews and vitals only; no room photos or identities)
 - Optional PostHog (`NUXT_PUBLIC_POSTHOG_KEY`)
 
 ## Local setup
