@@ -5,7 +5,7 @@ const environment = (globalThis as typeof globalThis & {
 export default defineNuxtConfig({
   compatibilityDate: '2026-09-01',
   devtools: { enabled: false },
-  modules: ['@nuxt/ui'],
+  modules: ['@nuxt/ui', '@vercel/analytics/nuxt'],
   css: ['~/assets/css/main.css'],
   nitro: {
     vercel: {
