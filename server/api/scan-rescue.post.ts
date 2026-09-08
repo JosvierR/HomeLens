@@ -3,6 +3,22 @@ import { roomScanSchema } from '~~/shared/decision-confidence'
 import { apiFailure, readContractBody, runDomainEngine } from '../utils/api-contract'
 import { getEvidenceRepository } from '../utils/evidence-repository'
 
+defineRouteMeta({
+  openAPI: {
+    tags: ['Decision'],
+    summary: 'Scan rescue',
+    description: 'Which unresolved measurement, if taped, most improves decision stability.',
+    requestBody: {
+      required: true,
+      content: { 'application/json': { schema: { type: 'object', description: 'DecisionRoomScan' } } }
+    },
+    responses: {
+      200: { description: 'Rescue action or already-stable status.' },
+      400: { description: 'Invalid scan contract.' }
+    }
+  }
+})
+
 export default defineEventHandler(async event => {
   try {
     const scan = await readContractBody(event, roomScanSchema)

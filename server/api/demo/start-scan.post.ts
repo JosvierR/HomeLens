@@ -3,6 +3,18 @@ import { requireUser } from '../../utils/require-user'
 import { MODEL_VERSIONS } from '~~/shared/model-versions'
 import { getRequestId, logServerEvent } from '../../utils/observability'
 
+defineRouteMeta({
+  openAPI: {
+    tags: ['Capture'],
+    summary: 'Start a demo/product scan shell',
+    description: 'Creates project, room, and draft scan for the camera flow. Requires a Supabase session (anonymous allowed).',
+    responses: {
+      200: { description: 'Project, room, and scan ids.' },
+      401: { description: 'Not signed in.' }
+    }
+  }
+})
+
 /** One-shot bootstrap for the public demo scan flow (anonymous or signed-in). */
 export default defineEventHandler(async event => {
   const started = Date.now()

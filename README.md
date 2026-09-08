@@ -59,37 +59,38 @@ npm run dev
 
 Open [http://127.0.0.1:3000](http://127.0.0.1:3000).
 
+API docs (dev only, from Nitro OpenAPI):
+
+- Scalar: [http://127.0.0.1:3000/_scalar](http://127.0.0.1:3000/_scalar)
+- Swagger UI: [http://127.0.0.1:3000/_swagger](http://127.0.0.1:3000/_swagger)
+- Spec: [http://127.0.0.1:3000/_openapi.json](http://127.0.0.1:3000/_openapi.json)
+
 ### Configure Supabase
 
-1. Create a Supabase project (or start local stack with Docker Desktop):
+Local Postgres/Auth/Storage is the official Supabase CLI stack. That uses Docker; do not wrap the Nuxt app in Docker.
+
+1. Start Docker Desktop, then:
 
 ```powershell
-npx supabase start
-npx supabase status -o env
+npm run supabase:start
 ```
 
-2. Set:
+That boots the containers, applies migrations, and writes a BOM-free `.env` pointed at `http://127.0.0.1:54321`. Studio: [http://127.0.0.1:54323](http://127.0.0.1:54323).
+
+2. Optional server-only inference (not required for local Auth/RLS):
 
 ```text
-NUXT_PUBLIC_SUPABASE_URL=...
-NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
-```
-
-Optional server-only:
-
-```text
-SUPABASE_SECRET_KEY=...
 NUXT_INFERENCE_API_URL=...
 NUXT_INFERENCE_API_TOKEN=...
 NUXT_INFERENCE_CALLBACK_SECRET=...
 NUXT_PUBLIC_SITE_URL=https://homelens-kappa.vercel.app
 ```
 
-3. Apply migrations:
+3. Reset local data / re-apply migrations:
 
 ```powershell
 npx supabase db reset
-# or against a linked remote:
+# linked remote only:
 npx supabase db push
 ```
 
@@ -106,7 +107,11 @@ python inference-worker/test_payload.py
 npm run benchmark:photo -- <private-dataset.json>
 ```
 
-Database/RLS tests require a running local Supabase (`npx supabase test db`).
+Database/RLS tests require a running local stack:
+
+```powershell
+npm run supabase:test
+```
 
 ## Docs
 

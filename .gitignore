@@ -2,6 +2,8 @@ node_modules
 .nuxt
 .output
 .env
+.env*.bak
+.env.cloud.bak
 .DS_Store
 artifacts/visual-qa/
 artifacts/functional-qa/

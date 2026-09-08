@@ -17,7 +17,7 @@
     "qa:design": "node scripts/design-capture.mjs",
     "qa:supabase": "node scripts/supabase-smoke.mjs",
     "benchmark:photo": "node scripts/benchmark-photo-metric.mjs",
-    "supabase:start": "supabase start",
+    "supabase:start": "supabase start && node scripts/sync-local-env.mjs",
     "supabase:stop": "supabase stop",
     "supabase:reset": "supabase db reset",
     "supabase:test": "supabase test db",

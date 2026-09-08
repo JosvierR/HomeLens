@@ -7,6 +7,19 @@ import { getRequestId, logServerEvent } from '../../../../utils/observability'
 import { requireUser } from '../../../../utils/require-user'
 import { getRoomMeasurementProvider } from '../../../../services/photo-metric-provider'
 
+defineRouteMeta({
+  openAPI: {
+    tags: ['Photo-metric'],
+    summary: 'Start GPU photo estimation',
+    description: 'Submits a signed job to the Modal Depth Pro worker. Does not mark the scan processing until the worker accepts. Returns 503 if the GPU host is down or out of credit.',
+    responses: {
+      200: { description: 'Job accepted.' },
+      401: { description: 'Not signed in.' },
+      503: { description: 'GPU worker unavailable.' }
+    }
+  }
+})
+
 const ACTIVE_RUN_STATUSES = new Set(['processing', 'succeeded', 'partial', 'insufficient'])
 
 const workerUnavailable = (error: unknown) => {

@@ -8,6 +8,17 @@ export default defineNuxtConfig({
   modules: ['@nuxt/ui', '@vercel/analytics', '@vercel/speed-insights'],
   css: ['~/assets/css/main.css'],
   nitro: {
+    experimental: {
+      openAPI: true
+    },
+    openAPI: {
+      meta: {
+        title: 'HomeLens API',
+        description: 'Room-measurement contracts: uncertainty, decision stability, verification, and photo-metric jobs. Interactive docs are development-only.',
+        version: '1.0.0'
+      },
+      production: false
+    },
     vercel: {
       functions: {
         maxDuration: 60

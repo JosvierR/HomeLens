@@ -4,6 +4,19 @@ import { captureEvidenceInitSchema } from '~~/shared/persistence-contracts'
 import { MODEL_VERSIONS } from '~~/shared/model-versions'
 import { getRequestId, logServerEvent } from '../../utils/observability'
 
+defineRouteMeta({
+  openAPI: {
+    tags: ['Capture'],
+    summary: 'Init private capture upload',
+    description: 'Creates a capture_evidence row and a short-lived Storage path under {user_id}/... EXIF must already be stripped on the client.',
+    responses: {
+      200: { description: 'Evidence id and upload target.' },
+      401: { description: 'Not signed in.' },
+      404: { description: 'Scan or project not found.' }
+    }
+  }
+})
+
 export default defineEventHandler(async (event) => {
   const started = Date.now()
   try {

@@ -5,6 +5,22 @@ import { applyManualVerification, manualVerificationRequestSchema } from '~~/sha
 import { ApiContractError, apiFailure, readContractBody } from '../../utils/api-contract'
 import { getEvidenceRepository } from '../../utils/evidence-repository'
 
+defineRouteMeta({
+  openAPI: {
+    tags: ['Verification'],
+    summary: 'Tape-verify a measurement',
+    description: 'Sets confidence to 1 for one dimension, keeps the original photo estimate, and records Error Atlas evidence.',
+    requestBody: {
+      required: true,
+      content: { 'application/json': { schema: { type: 'object', description: 'scan + measurementId + verifiedValue' } } }
+    },
+    responses: {
+      200: { description: 'Updated scan and recorded evidence.' },
+      400: { description: 'Invalid verification payload.' }
+    }
+  }
+})
+
 export default defineEventHandler(async event => {
   try {
     const request = await readContractBody(event, manualVerificationRequestSchema)
